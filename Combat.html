@@ -751,6 +751,7 @@ let activeParticipant=null, selectedObject=null, selectedObjects=[];
 let drawMode=false, drawTool='freehand', isDrawing=false, currentDrawing=null;
 let hostFreeMoveMode=false; // drag tokens/objects without movespeed cost
 let draggingParticipantRef=null, participantDragOffset={x:0,y:0}; // for free-move drag
+let draggingDie=false; // physically throwing a 3D die
 let measuring=null, moveConfig=false, moveHistory=[];
 let selectionRect=null, selecting=false, isMouseDown=false, mouseDownPos=null;
 let multiDragInitial=null, draggingObjectRef=null, objectDragOffset={x:0,y:0};
@@ -2009,6 +2010,12 @@ canvas.addEventListener('mousedown',evt=>{
   if(evt.button===2)return;
   const pos=screenToCanvas(evt);isMouseDown=true;mouseDownPos=pos;
 
+  // 3D die pickup (host and guest)
+  if(window.combatDice&&window.combatDice._dice.length>0){
+    const dieIdx=window.combatDice.findDieAt(pos.x,pos.y);
+    if(dieIdx>=0){draggingDie=true;window.combatDice.startDieDrag(dieIdx,pos.x,pos.y);return;}
+  }
+
   // GUEST
   if(!isHost){
     if(guestDrawMode&&guestDrawEnabled){
@@ -2103,6 +2110,8 @@ canvas.addEventListener('mousedown',evt=>{
 
 canvas.addEventListener('mousemove',evt=>{
   const pos=screenToCanvas(evt);
+  // Die drag (host and guest)
+  if(draggingDie&&isMouseDown){window.combatDice?.updateDieDrag(pos.x,pos.y);return;}
   if(!isHost){
     if(guestIsDrawing&&guestCurrentDrawing){const o=guestCurrentDrawing;if(o.type==='freehand')o.points.push(pos);else if(o.type==='circle')o.r=Math.sqrt((pos.x-o.x)**2+(pos.y-o.y)**2);else if(o.type==='rect'){o.w=pos.x-o.x;o.h=pos.y-o.y;}drawAll();drawCurrentPreview(guestCurrentDrawing);return;}
     if(guestMeasuring&&guestMeasuring.active){guestMeasuring.cursorX=pos.x;guestMeasuring.cursorY=pos.y;drawAll();}
@@ -2114,7 +2123,7 @@ canvas.addEventListener('mousemove',evt=>{
     draggingParticipantRef.y=pos.y-participantDragOffset.y;
     drawAll();return;
   }
-  if(!drawMode&&!isMouseDown)canvas.classList.toggle('can-drag',hostFreeMoveMode?!!(findParticipantAt(pos)||findObjectAt(pos)):!!(findObjectAt(pos)?.draggable));
+  if(!drawMode&&!isMouseDown){const _overDie=window.combatDice&&window.combatDice._dice.length>0&&window.combatDice.findDieAt(pos.x,pos.y)>=0;canvas.classList.toggle('can-drag',_overDie||(hostFreeMoveMode?!!(findParticipantAt(pos)||findObjectAt(pos)):!!(findObjectAt(pos)?.draggable)));}
   if(drawMode&&isDrawing&&currentDrawing){const o=currentDrawing;if(o.type==='freehand')o.points.push(pos);else if(o.type==='circle')o.r=Math.sqrt((pos.x-o.x)**2+(pos.y-o.y)**2);else if(o.type==='rect'){o.w=pos.x-o.x;o.h=pos.y-o.y;}drawAll();drawCurrentPreview(currentDrawing);return;}
   if(selecting&&selectionRect){selectionRect.w=pos.x-selectionRect.x;selectionRect.h=pos.y-selectionRect.y;drawAll();return;}
   if(draggingObjectRef&&isMouseDown){
@@ -2136,6 +2145,7 @@ canvas.addEventListener('mousemove',evt=>{
 
 canvas.addEventListener('mouseup',evt=>{
   isMouseDown=false;mouseDownPos=null;
+  if(draggingDie){draggingDie=false;window.combatDice?.releaseDieDrag();return;}
   if(!isHost&&guestIsDrawing&&guestCurrentDrawing){let obj={...guestCurrentDrawing};if(obj.type==='circle'){obj.cx=obj.x;obj.cy=obj.y;}guestIsDrawing=false;guestCurrentDrawing=null;send({type:'guest_draw',object:obj});objects.push(obj);drawAll();return;}
   if(isHost&&drawMode&&isDrawing&&currentDrawing){let obj={...currentDrawing};if(obj.type==='circle')obj={...obj,cx:obj.x,cy:obj.y};objects.push(obj);selectedObject=objects[objects.length-1];selectedObjects=[selectedObject.id];updateSelectedObjectUI();currentDrawing=null;isDrawing=false;drawAll();syncToServer();return;}
   if(isHost&&selecting&&selectionRect){
@@ -2182,7 +2192,7 @@ canvas.addEventListener('contextmenu',evt=>{
 });
 
 canvas.addEventListener('wheel',e=>{if(!isHost||!e.shiftKey||!selectedObject||selectedObjects.length>1)return;const o=selectedObject;if(o.type!=='image')return;e.preventDefault();const delta=e.deltaY<0?1.1:0.9;o.w*=delta;o.h*=delta;drawAll();},{passive:false});
-canvas.addEventListener('mouseleave',()=>{if(!isHost)return;isMouseDown=false;isDrawing=false;draggingObjectRef=null;draggingParticipantRef=null;selecting=false;selectionRect=null;drawAll();});
+canvas.addEventListener('mouseleave',()=>{if(draggingDie){draggingDie=false;window.combatDice?.releaseDieDrag();}if(!isHost)return;isMouseDown=false;isDrawing=false;draggingObjectRef=null;draggingParticipantRef=null;selecting=false;selectionRect=null;drawAll();});
 
 
 /* ================================================================
@@ -3253,13 +3263,44 @@ function createD4Die(opts={}){
   return mesh;
 }
 
+function createD12Die(opts={}){
+  const geometry=new THREE.DodecahedronGeometry(0.74,0);
+  const{geo,normals,centers}=triData(geometry);
+  const dc=opts.diceColor||'#f7f8fd',nc=opts.numberColor||'#111827',gc=opts.glowColor||nc;
+  // Group the 36 triangles into 12 pentagonal face groups (3 triangles share one face)
+  const eps=0.01;
+  const faceGroups=[];
+  for(let i=0;i<normals.length;i++){
+    let found=false;
+    for(const fg of faceGroups){
+      if(fg.normal.distanceTo(normals[i])<eps){fg.indices.push(i);fg.avgCenter.add(centers[i]);found=true;break;}
+    }
+    if(!found)faceGroups.push({normal:normals[i].clone(),indices:[i],avgCenter:centers[i].clone()});
+  }
+  for(const fg of faceGroups)fg.avgCenter.multiplyScalar(1/fg.indices.length);
+  const mesh=new THREE.Mesh(geo,makeDiceMaterial(dc));
+  mesh.castShadow=true;mesh.receiveShadow=true;
+  mesh.userData.sides=12;mesh.userData.kind='face';
+  const faceValues=Array.from({length:faceGroups.length},(_,i)=>i+1);
+  mesh.userData.faceMap=faceGroups.map((fg,i)=>({normal:fg.normal,value:faceValues[i]}));
+  const scale=0.58,offset=0.034;
+  for(let i=0;i<faceGroups.length;i++){
+    const fg=faceGroups[i];
+    const n=fg.normal.clone().normalize();
+    const lp=makeLabelPlane(faceValues[i],'face',scale,{numberColor:nc,glowColor:gc});
+    lp.position.copy(fg.avgCenter).add(n.clone().multiplyScalar(offset));
+    orientToNormal(lp,n);mesh.add(lp);
+  }
+  return mesh;
+}
+
 function createDieVisual(sides,opts={}){
   if(sides===3)return createCubeDie([1,1,2,2,3,3],'face',opts);
   if(sides===4)return createD4Die(opts);
   if(sides===6)return createCubeDie([3,4,1,6,2,5],'pip',opts);
   if(sides===8)return createPolyDie(8,new THREE.OctahedronGeometry(0.74,0),null,opts,'d8');
   if(sides===10)return createPolyDie(20,new THREE.IcosahedronGeometry(0.76,0),[1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10],opts,'d10');
-  if(sides===12)return createPolyDie(12,new THREE.DodecahedronGeometry(0.74,0),null,opts,'face');
+  if(sides===12)return createD12Die(opts);
   if(sides===20)return createPolyDie(20,new THREE.IcosahedronGeometry(0.76,0),null,opts,'d20');
   return createCubeDie([3,4,1,6,2,5],'pip',opts);
 }
@@ -3298,6 +3339,7 @@ class CombatDiceRoller{
     this._rollMeta={rollId:null,expression:null,seed:null,shared:false};
     this._pendingSharedResult=null;
     this._rng=Math.random;
+    this._draggedDieIdx=null;this._dragCurWorld=null;this._dragPrevWorld=null;this._dragCurTime=null;this._dragPrevTime=null;
     this.settings={diceColor:'#f7f8fd',numberColor:'#1a1a2e',glowColor:'#f7f8fd',randomizeColors:true,dieScale:1,launchVelocity:9,launchSpin:12,bounciness:0.22};
     this._init();
     this._syncSize();
@@ -3437,6 +3479,103 @@ class CombatDiceRoller{
       r.className='';
       r.innerHTML=`<div class="dice-result-total">${total}</div><div class="dice-result-breakdown">${breakdown}</div>`;
     }
+  }
+
+  // ── PHYSICAL DIE INTERACTION ──────────────────────────────────
+  canvasToWorld(cssPx,cssPy){
+    const rect=this.diceCanvas.getBoundingClientRect();
+    const nx=cssPx/rect.width, ny=cssPy/rect.height;
+    const cam=this.camera;
+    return{wx:cam.left+nx*(cam.right-cam.left),wz:-cam.top+ny*(cam.top-cam.bottom)};
+  }
+
+  findDieAt(cssPx,cssPy){
+    if(!this._dice.length)return -1;
+    const{wx,wz}=this.canvasToWorld(cssPx,cssPy);
+    let best=-1,bestD=1.4;
+    for(let i=0;i<this._dice.length;i++){
+      const b=this._dice[i].body;
+      const dx=b.position.x-wx,dz=b.position.z-wz;
+      const d=Math.sqrt(dx*dx+dz*dz);
+      if(d<bestD){bestD=d;best=i;}
+    }
+    return best;
+  }
+
+  startDieDrag(dieIdx,cssPx,cssPy){
+    if(dieIdx<0||dieIdx>=this._dice.length)return false;
+    if(this._poller){clearInterval(this._poller);this._poller=null;}
+    if(this._rollTimeout){clearTimeout(this._rollTimeout);this._rollTimeout=null;}
+    const d=this._dice[dieIdx];
+    d.body.type=CANNON.Body.KINEMATIC;
+    d.body.velocity.set(0,0,0);
+    d.body.angularVelocity.set(0,0,0);
+    this._draggedDieIdx=dieIdx;
+    const{wx,wz}=this.canvasToWorld(cssPx,cssPy);
+    this._dragCurWorld={wx,wz};this._dragPrevWorld={wx,wz};
+    this._dragCurTime=performance.now();this._dragPrevTime=performance.now();
+    d.body.position.set(wx,1.5,wz);
+    this._rolling=false;
+    const r=document.getElementById('diceResult');
+    if(r){r.className='rolling';r.textContent='✋ Held…';}
+    return true;
+  }
+
+  updateDieDrag(cssPx,cssPy){
+    if(this._draggedDieIdx==null||this._draggedDieIdx<0)return;
+    const d=this._dice[this._draggedDieIdx];
+    if(!d)return;
+    const{wx,wz}=this.canvasToWorld(cssPx,cssPy);
+    this._dragPrevWorld=this._dragCurWorld;
+    this._dragPrevTime=this._dragCurTime;
+    this._dragCurWorld={wx,wz};
+    this._dragCurTime=performance.now();
+    d.body.position.set(wx,1.5,wz);
+    d.body.velocity.set(0,0,0);
+    d.body.angularVelocity.set(0,0,0);
+  }
+
+  releaseDieDrag(){
+    if(this._draggedDieIdx==null||this._draggedDieIdx<0){this._draggedDieIdx=null;return;}
+    const d=this._dice[this._draggedDieIdx];
+    if(!d){this._draggedDieIdx=null;return;}
+    d.body.type=CANNON.Body.DYNAMIC;
+    const cur=this._dragCurWorld||{wx:0,wz:0};
+    const prev=this._dragPrevWorld||cur;
+    const dt=Math.max(0.016,((this._dragCurTime||0)-(this._dragPrevTime||0))/1000);
+    const throwScale=10;
+    const rawVx=(cur.wx-prev.wx)/dt*throwScale;
+    const rawVz=(cur.wz-prev.wz)/dt*throwScale;
+    const speed=Math.sqrt(rawVx*rawVx+rawVz*rawVz);
+    const maxSpeed=this.settings.launchVelocity*4;
+    const clamp=speed>maxSpeed?maxSpeed/speed:1;
+    const vx=rawVx*clamp, vz=rawVz*clamp;
+    const vy=4+speed*clamp*0.2;
+    d.body.velocity.set(vx,vy,vz);
+    const sp=this.settings.launchSpin;
+    const rand=this._rng||Math.random;
+    d.body.angularVelocity.set((rand()-0.5)*sp,(rand()-0.5)*sp,(rand()-0.5)*sp);
+    d.body.wakeUp?.();
+    this._draggedDieIdx=null;
+    this._dragCurWorld=null;this._dragPrevWorld=null;
+    // Restart settle poller so die reads new value
+    this._settleFrames=0;
+    this._rolling=true;
+    const r=document.getElementById('diceResult');
+    if(r){r.className='rolling';r.textContent='🎲 Rolling…';}
+    if(this._poller)clearInterval(this._poller);
+    const{mod}=parseExpression(this._rollMeta.expression||'');
+    const expr=this._rollMeta.expression||'thrown';
+    this._poller=setInterval(()=>{
+      if(!this._rolling){clearInterval(this._poller);this._poller=null;return;}
+      const still=this._dice.every(di=>di.body.velocity.lengthSquared()<0.01&&di.body.angularVelocity.lengthSquared()<0.01);
+      this._settleFrames=still?this._settleFrames+1:0;
+      if(this._settleFrames>28||this._dice.every(di=>di.body.sleepState===CANNON.Body.SLEEPING)){
+        this._finishRoll(mod,expr);clearInterval(this._poller);this._poller=null;
+      }
+    },80);
+    if(this._rollTimeout)clearTimeout(this._rollTimeout);
+    this._rollTimeout=setTimeout(()=>{if(this._rolling)this._forceFinish(expr,mod);},8000);
   }
 
   spawnDie(sides,index,total,sign){
