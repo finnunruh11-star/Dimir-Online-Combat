@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TTRPG Combat Simulator – Enhanced v2 (fixed)</title>
+<style>
+  :root{--ui-width:360px;--canvas-bg:#f8f8f8;--primary:#4f6ef6;--danger:#f05b5b;--success:#10b981}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;display:flex;gap:18px;margin:0;padding:18px;background:#fafafa}
+  #controls{width:var(--ui-width);max-width:45vw;display:flex;flex-direction:column;gap:12px}
+  .panel{background:#fff;border-radius:8px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+  .panel-title{font-size:14px;font-weight:600;margin:0 0 10px;color:#333;text-transform:uppercase;letter-spacing:0.5px}
+  input,select,button{width:100%;margin:0;padding:8px;border-radius:6px;border:1px solid #ddd;font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,110,246,0.1)}
+  button{background:var(--primary);color:#fff;border:none;cursor:pointer;font-weight:500;transition:all 0.2s}
+  button:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(79,110,246,0.3)}
+  button:active{transform:translateY(0)}
+  button.secondary{background:#6b7280;color:#fff}
+  button.danger{background:var(--danger)}
+  button.success{background:var(--success)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .tab-buttons{display:flex;gap:4px;margin-bottom:10px}
+  .tab-btn{padding:8px;background:#f3f4f6;color:#6b7280;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;flex:1}
+  .tab-btn.active{background:var(--primary);color:#fff}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+  #battle-wrap{flex:1;display:flex;align-items:flex-start;justify-content:center}
+  canvas{border:1px solid #ddd;background:var(--canvas-bg);cursor:crosshair;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+canvas.can-drag{cursor:move}
+  .initiative-item{cursor:grab;padding:10px;margin:4px 0;background:#fafafa;border-radius:6px;border:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;transition:all 0.2s}
+  .initiative-item:hover{background:#f3f4f6;border-color:#d1d5db}
+  .initiative-item.active{background:#fef3c7;border-color:#fbbf24;font-weight:600}
+  .initiative-name{font-size:14px;color:#1f2937}
+  .initiative-stats{font-size:12px;color:#6b7280}
+  .current-turn-banner{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;padding:12px;border-radius:8px;text-align:center;font-weight:600;font-size:15px;margin-bottom:8px;box-shadow:0 2px 8px rgba(251,191,36,0.3)}
+  .mode-indicator{font-size:12px;padding:6px 10px;background:#e0e7ff;color:#4338ca;border-radius:4px;text-align:center;font-weight:500;margin-bottom:8px}
+  .help-text{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}
+  label.checkbox{display:flex;align-items:center;cursor:pointer;font-size:14px;color:#374151}
+  label.checkbox input{width:auto;margin:0 8px 0 0}
+  .color-picker-row{display:flex;gap:8px}
+  .color-picker-row input[type="color"]{width:50px;height:40px;padding:2px;cursor:pointer}
+  .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .input-group{margin-bottom:8px}
+  .input-group label{display:block;font-size:12px;color:#6b7280;margin-bottom:4px;font-weight:500}
+  
+  /* Better panel spacing */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Fix row responsiveness and prevent clipping */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Inputs scale properly instead of being squeezed */
+.input-group {
+  min-width: 140px;          /* Do not shrink too far */
+  flex: 1;                   /* Expand evenly */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Small buttons stay aligned */
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Keep Kill + Show Range aligned */
+.action-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Improve labels */
+.input-group label,
+.panel-title {
+  font-weight: 600;
+}
+
+/* Make tab panel scrollable if necessary */
+.tab-content {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <!-- Current Turn Banner -->
+  <div id="currentTurnBanner" class="current-turn-banner" style="display:none">
+    Current Turn: <span id="currentTurnName">—</span>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="panel">
+    <div class="tab-buttons">
+      <button class="tab-btn active" data-tab="combat">⚔️ Combat</button>
+      <button class="tab-btn" data-tab="draw">✏️ Draw</button>
+      <button class="tab-btn" data-tab="tools">🔧 Tools</button>
+    </div>
+
+<!-- COMBAT TAB -->
+<div class="tab-content active" id="tab-combat">
+
+  <!-- CHARACTER CREATION -->
+  <div class="panel-title">Create Character</div>
+  
+  <div class="input-group">
+    <label>Character Name</label>
+    <input id="name" placeholder="Enter name..." />
+  </div>
+
+  <div class="row">
+    <div class="input-group">
+      <label>Initiative</label>
+      <input id="initiative" type="number" placeholder="0" />
+    </div>
+
+    <div class="input-group">
+      <label>Speed (units)</label>
+      <input id="movespeed" type="number" placeholder="30" />
+    </div>
+
+    <div class="input-group">
+      <label>Max HP (players only)</label>
+      <input id="createMaxHp" type="number" placeholder="0" />
+    </div>
+  </div>
+<div class="input-group">
+  <label>Type</label>
+  <div class="row">
+    <select id="type">
+      <option value="player">🛡️ Player</option>
+      <option value="enemy">⚔️ Enemy</option>
+    </select>
+
+    <input id="playerColor" type="color" value="#4f6ef6" title="Player color" style="width:50px" />
+    <input id="enemyColor" type="color" value="#f05b5b" title="Enemy color" style="width:50px" />
+  </div>
+</div>
+
+<!-- This now stands alone (no clipping) -->
+<div class="input-group" id="enemySizeGroup" style="display:none;">
+  <label>Enemy Size (px radius)</label>
+  <input id="enemySize" type="number" value="15" />
+</div>
+<!-- Player size (configurable) -->
+<div class="input-group" id="playerSizeGroup" style="display:block;">
+  <label>Player Size (px radius)</label>
+  <input id="playerSize" type="number" value="15" />
+</div>
+
+
+
+  <button id="addBtn" class="success" style="margin-top:6px;">➕ Add Character</button>
+
+
+  <!-- INITIATIVE ORDER -->
+  <div style="margin-top:20px;">
+    <div class="panel-title">Initiative Order</div>
+    <div id="initiativeOrder" style="max-height:200px;overflow-y:auto"></div>
+
+    <div class="quick-actions" style="margin-top:10px">
+      <button id="startBtn" class="success">▶️ Start</button>
+      <button id="nextBtn" class="secondary">⏭️ Next Turn</button>
+      <button id="killEntityBtn" class="danger" title="Kill selected entity">💀 Kill Selected</button>
+    </div>
+  </div>
+
+
+  <!-- HP CONTROLS -->
+  <div style="margin-top:20px;" id="hpControls">
+    <div class="panel-title">HP (Selected Player)</div>
+
+    <div class="row">
+      <input id="currentHp" type="number" placeholder="Current HP" />
+      <input id="maxHpControl" type="number" placeholder="Max HP" />
+    </div>
+
+    <div class="quick-actions" style="margin-top:8px;">
+      <button id="hpDecrease" class="secondary">-</button>
+      <button id="hpIncrease" class="secondary">+</button>
+      <button id="applyHp" class="success">Apply</button>
+    </div>
+  </div>
+
+
+  <!-- MOVEMENT -->
+  <div style="margin-top:20px;">
+    <div class="panel-title">Movement</div>
+
+    <div class="row">
+      <div class="input-group">
+        <label>Extra Move</label>
+        <input id="moveRange" type="number" placeholder="0" value="0" />
+      </div>
+
+      <button id="showMoveBtn" class="secondary" style="height:40px;">Show Range</button>
+    </div>
+
+    <label class="checkbox" style="margin-top:6px;">
+      <input id="moveConfigToggle" type="checkbox" />
+      Free movement mode (ignore turn order)
+    </label>
+
+    <button id="undoMoveBtn" class="secondary" style="margin-top:8px;">↶ Undo Move (Ctrl+Z)</button>
+  </div>
+
+</div>
+
+
+    <!-- DRAW TAB -->
+    <div class="tab-content" id="tab-draw">
+      <div id="drawModeIndicator" class="mode-indicator">Draw Mode Active</div>
+      
+      <div class="input-group">
+        <label>Drawing Tool</label>
+        <select id="drawTool">
+          <option value="freehand">✏️ Freehand</option>
+          <option value="circle">⭕ Circle</option>
+          <option value="rect">▢ Rectangle</option>
+          <!-- Select removed: SHIFT will always do selection -->
+        </select>
+      </div>
+
+      <label class="checkbox">
+        <input id="fillShapesToggle" type="checkbox" />
+        Fill shapes with color
+      </label>
+	  
+	  <div class="input-group">
+  <label>Upload PNG</label>
+  <input type="file" id="imageUpload" accept="image/png" />
+</div>
+
+
+      <div class="quick-actions" style="margin-top:12px">
+        <button id="cancelDraw" class="secondary">❌ Cancel</button>
+        <button id="clearObjects" class="danger">🗑️ Clear All</button>
+      </div>
+
+      <div style="margin-top:16px;padding:12px;background:#fef3c7;border-radius:6px;font-size:13px">
+        <strong>Selected:</strong> <span id="selectedObjectLabel">None</span>
+        <div class="quick-actions" style="margin-top:8px">
+          <button id="deleteObject" class="danger">Delete</button>
+          <button id="toggleDragObject" class="secondary">Lock/Unlock</button>
+        </div>
+      </div>
+
+      <div class="help-text">
+        💡 Click to select a single object. Hold <strong>Shift</strong> and drag to multi-select with a rectangle, or hold <strong>Shift</strong> and click objects to add/remove them to the selection. Drag selected objects to move all selected items together.
+      </div>
+    </div>
+
+    <!-- TOOLS TAB -->
+    <div class="tab-content" id="tab-tools">
+      <div class="input-group">
+        <label>Custom Range Circle (units)</label>
+        <div class="row">
+          <input id="manualCircleUnits" type="number" placeholder="60" />
+          <button id="showManualCircle" class="secondary">Show</button>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="panel-title">Measure Distance</div>
+        <div class="input-group">
+          <label>From</label>
+          <select id="distanceFrom"></select>
+        </div>
+        <div class="input-group">
+          <label>To</label>
+          <select id="distanceTo"></select>
+        </div>
+        <button id="checkDistance">📏 Calculate Distance</button>
+        <div id="distanceResult" style="margin-top:8px;padding:8px;background:#e0e7ff;border-radius:6px;text-align:center;font-weight:600;color:#4338ca;min-height:20px"></div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="panel-title">Battlefield Size</div>
+        <div class="row">
+          <input id="battleWidth" type="number" placeholder="900" />
+          <input id="battleHeight" type="number" placeholder="700" />
+        </div>
+        <button id="setBattleSize" class="secondary">Resize Canvas</button>
+      </div>
+
+      <div class="help-text" style="margin-top:16px">
+        💡 <strong>Right-click</strong> any character to measure distance dynamically to your cursor. Right-click again to stop.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="battle-wrap">
+  <canvas id="battlefield" width="900" height="700"></canvas>
+</div>
+
+<script>
+/* ----------------- CONFIG ----------------- */
+const PIXELS_PER_UNIT = 20; // default; editable in code
+const PARTICLE_RADIUS = 15;
+
+/* ----------------- STATE ----------------- */
+let participants = [];
+let objects = []; // drawn objects
+let selectedObjects = []; // array of object ids selected via shift or selection
+let turnIndex = 0;
+let activeParticipant = null;
+let selectedObject = null; // single selected (for UI convenience)
+let draggingSelection = false;
+let draggingObjectRef = null;
+let objectDragOffset = {x:0,y:0};
+let drawMode = false;
+let drawTool = 'freehand';
+let isDrawing = false;
+let currentDrawing = null;
+let measuring = null; // {entity, active, cursorX, cursorY}
+let moveConfig = false;
+let pixelsPerUnit = PIXELS_PER_UNIT;
+let moveHistory = []; // for undoing movement: {type:'move', name, from:{x,y}, to:{x,y}}
+let selectionRect = null;
+let selecting = false;
+let isMouseDown = false;
+let mouseDownPos = null;
+let multiDragInitial = null; // store initial positions for multi-drag
+
+/* ----------------- DOM ----------------- */
+const canvas = document.getElementById('battlefield');
+const ctx = canvas.getContext('2d');
+
+const addBtn = document.getElementById('addBtn');
+const nameEl = document.getElementById('name');
+const initiativeEl = document.getElementById('initiative');
+const movespeedEl = document.getElementById('movespeed');
+const typeEl = document.getElementById('type');
+const playerColorEl = document.getElementById('playerColor');
+const enemyColorEl = document.getElementById('enemyColor');
+
+const initiativeOrder = document.getElementById('initiativeOrder');
+const startBtn = document.getElementById('startBtn');
+const nextBtn = document.getElementById('nextBtn');
+const currentTurnBanner = document.getElementById('currentTurnBanner');
+const currentTurnName = document.getElementById('currentTurnName');
+
+const moveRangeEl = document.getElementById('moveRange');
+const showMoveBtn = document.getElementById('showMoveBtn');
+const moveConfigToggle = document.getElementById('moveConfigToggle');
+
+const drawToolSelect = document.getElementById('drawTool');
+const fillShapesToggle = document.getElementById('fillShapesToggle');
+const cancelDrawBtn = document.getElementById('cancelDraw');
+const clearObjectsBtn = document.getElementById('clearObjects');
+
+const selectedObjectLabel = document.getElementById('selectedObjectLabel');
+const deleteObjectBtn = document.getElementById('deleteObject');
+const toggleDragObjectBtn = document.getElementById('toggleDragObject');
+
+const manualCircleUnitsEl = document.getElementById('manualCircleUnits');
+const showManualCircleBtn = document.getElementById('showManualCircle');
+
+const undoMoveBtn = document.getElementById('undoMoveBtn');
+
+const battleWidthEl = document.getElementById('battleWidth');
+const battleHeightEl = document.getElementById('battleHeight');
+const setBattleSizeBtn = document.getElementById('setBattleSize');
+
+const distanceFrom = document.getElementById('distanceFrom');
+const distanceTo = document.getElementById('distanceTo');
+const checkDistanceBtn = document.getElementById('checkDistance');
+const distanceResult = document.getElementById('distanceResult');
+
+const createMaxHpEl = document.getElementById('createMaxHp'); // for creation
+const currentHpEl = document.getElementById('currentHp');
+const maxHpControlEl = document.getElementById('maxHpControl');
+const hpDecreaseBtn = document.getElementById('hpDecrease');
+const hpIncreaseBtn = document.getElementById('hpIncrease');
+const applyHpBtn = document.getElementById('applyHp');
+
+const enemySizeGroup = document.getElementById("enemySizeGroup");
+const enemySizeEl = document.getElementById("enemySize");
+const playerSizeGroup = document.getElementById('playerSizeGroup');
+const playerSizeEl = document.getElementById('playerSize');
+
+
+typeEl.addEventListener('change', () => {
+  if (typeEl.value === 'enemy') {
+    enemySizeGroup.style.display = 'block';
+    playerSizeGroup.style.display = 'none';
+  } else {
+    enemySizeGroup.style.display = 'none';
+    playerSizeGroup.style.display = 'block';
+  }
+});
+
+
+
+
+/* ----------------- TAB SYSTEM ----------------- */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetTab = btn.dataset.tab;
+    
+    // Update active states
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    btn.classList.add('active');
+    document.getElementById(`tab-${targetTab}`).classList.add('active');
+    
+    // Auto-enable draw mode when on draw tab
+    drawMode = (targetTab === 'draw');
+    drawAll();
+  });
+});
+
+/* ----------------- UTIL ----------------- */
+function screenToCanvas(evt){ const r = canvas.getBoundingClientRect(); return {x: evt.clientX - r.left, y: evt.clientY - r.top}; }
+function distance(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+
+/* ----------------- PARTICIPANT CONTROLS ----------------- */
+addBtn.addEventListener('click', ()=>{
+  const name = nameEl.value.trim();
+  const initiative = parseInt(initiativeEl.value);
+  const type = typeEl.value;
+  const speed = parseInt(movespeedEl.value) || 0;
+  const color = type === 'player' ? playerColorEl.value : enemyColorEl.value;
+  if(!name || isNaN(initiative)) return alert('Enter valid name and initiative.');
+  const createMaxHpEl = document.getElementById('createMaxHp');
+let maxHpVal = parseInt(createMaxHpEl.value);
+if (type === 'player') {
+  maxHpVal = isNaN(maxHpVal) ? 0 : Math.max(0, maxHpVal);
+} else {
+  maxHpVal = undefined;
+}
+let radius = PARTICLE_RADIUS;
+if (type === "player") {
+  const r = parseInt(playerSizeEl.value);
+  radius = isNaN(r) ? PARTICLE_RADIUS : Math.max(5, r);
+} else if (type === "enemy") {
+  const r = parseInt(enemySizeEl.value);
+  radius = isNaN(r) ? PARTICLE_RADIUS : Math.max(5, r);
+}
+
+participants.push({
+  name,
+  initiative,
+  type,
+  x: Math.random()*700+80,
+  y: Math.random()*500+60,
+  speed,
+  color,
+  radius,    
+  hasMoved:false,
+  maxHp: maxHpVal,
+  hp: (maxHpVal !== undefined) ? maxHpVal : undefined
+});
+
+  updateInitiativeList();
+  nameEl.value=''; initiativeEl.value=''; movespeedEl.value='';
+  drawAll();
+});
+
+function updateInitiativeList(){
+  initiativeOrder.innerHTML='';
+  participants.forEach((p,i)=>{
+    const div = document.createElement('div');
+    div.draggable = true;
+    div.className = 'initiative-item';
+    if(p===activeParticipant) div.classList.add('active');
+    div.dataset.index = i;
+    
+    const leftDiv = document.createElement('div');
+    leftDiv.innerHTML = `<div class="initiative-name">${p.name} ${p.type === 'player' ? '🛡️' : '⚔️'}</div><div class="initiative-stats">Init: ${p.initiative} • Speed: ${p.speed}${p.hasMoved ? ' • ✓ Moved' : ''}</div>`;
+    
+    div.appendChild(leftDiv);
+    initiativeOrder.appendChild(div);
+  });
+  enableInitiativeDnD();
+  
+  // Update dropdowns
+  distanceFrom.innerHTML=''; distanceTo.innerHTML='';
+  participants.forEach(p=> {
+    const o1 = document.createElement('option'); o1.value=p.name; o1.textContent=p.name; distanceFrom.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value=p.name; o2.textContent=p.name; distanceTo.appendChild(o2);
+  });
+  updateCurrentTurnLabel();
+  refreshHpControls();
+}
+
+startBtn.addEventListener('click', ()=>{
+  if(participants.length===0) return alert('Add participants first.');
+  participants.forEach(p=> p.hasMoved=false);
+  turnIndex = 0; activeParticipant = participants[turnIndex];
+  updateInitiativeList(); drawAll();
+});
+
+nextBtn.addEventListener('click', ()=>{
+  if(!activeParticipant) return alert('Start combat first.');
+  turnIndex = (turnIndex+1) % participants.length;
+  activeParticipant = participants[turnIndex];
+  activeParticipant.hasMoved = false;
+  updateInitiativeList(); drawAll();
+});
+
+function updateCurrentTurnLabel(){
+  if(activeParticipant) {
+    currentTurnBanner.style.display = 'block';
+    currentTurnName.textContent = `${activeParticipant.name} (${activeParticipant.type === 'player' ? '🛡️ Player' : '⚔️ Enemy'})`;
+  } else {
+    currentTurnBanner.style.display = 'none';
+  }
+}
+
+/* ----------------- MOVE / RANGE / UNDO ----------------- */
+showMoveBtn.addEventListener('click', ()=> showMoveCircle());
+moveConfigToggle.addEventListener('change', ()=> moveConfig = moveConfigToggle.checked);
+
+const killEntityBtn = document.getElementById('killEntityBtn');
+killEntityBtn.addEventListener('click', () => {
+  if (!activeParticipant) return alert('Select an entity to kill/delete.');
+  if (!confirm(`Delete ${activeParticipant.name}?`)) return;
+
+  // remove any measurement referencing this entity
+  if (measuring && measuring.entity === activeParticipant) {
+    measuring = null;
+  }
+
+  // remove from participants
+  participants = participants.filter(p => p !== activeParticipant);
+
+  // reset active participant and turn index safely
+  activeParticipant = null;
+  turnIndex = 0;
+  updateInitiativeList();
+  drawAll();
+});
+
+
+function showMoveCircle(units){
+  // Draw the circle for the currently active participant WITHOUT clearing/redrawing everything.
+  if(!activeParticipant) return;
+  const extra = (typeof units === 'number') ? units : (parseInt(moveRangeEl.value) || 0);
+  const rangeUnits = (activeParticipant.speed || 0) + extra;
+  const rangePx = rangeUnits * pixelsPerUnit + (activeParticipant.radius || PARTICLE_RADIUS);
+  ctx.save();
+  ctx.strokeStyle = 'green';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(activeParticipant.x, activeParticipant.y, rangePx, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === "Delete" || e.key === "Backspace") {
+    if (selectedObjects.length > 0) {
+      objects = objects.filter(o => !selectedObjects.includes(o.id));
+      selectedObjects = [];
+      selectedObject = null;
+      updateSelectedObjectUI();
+      drawAll();
+      e.preventDefault();
+    } else if (selectedObject) {
+      objects = objects.filter(o => o.id !== selectedObject.id);
+      selectedObject = null;
+      updateSelectedObjectUI();
+      drawAll();
+      e.preventDefault();
+    }
+  }
+});
+
+
+showManualCircleBtn.addEventListener('click', ()=> {
+  const units = parseFloat(manualCircleUnitsEl.value);
+  if (isNaN(units)) return alert('Enter units number');
+
+  if (!activeParticipant) return alert("Select an entity first.");
+
+  const cx = activeParticipant.x;
+  const cy = activeParticipant.y;
+  const radiusPx = units * pixelsPerUnit;
+
+  drawAll();
+
+  // Draw the circle
+  ctx.save();
+  ctx.strokeStyle = 'green';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Highlight all participants inside radius
+  participants.forEach(p => {
+    const dist = Math.sqrt((p.x - cx)**2 + (p.y - cy)**2);
+    if (dist <= radiusPx + (p.radius || PARTICLE_RADIUS)) {
+
+      ctx.save();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius || PARTICLE_RADIUS, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+});
+
+
+
+// movement undo
+function pushMoveHistory(entry){
+  moveHistory.push(entry);
+  if(moveHistory.length>100) moveHistory.shift();
+}
+undoMoveBtn.addEventListener('click', undoLastMove);
+window.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); undoLastMove(); }
+});
+
+hpDecreaseBtn.addEventListener('click', ()=> {
+  if (!activeParticipant || activeParticipant.type !== 'player') return;
+  activeParticipant.hp = Math.max(0, (activeParticipant.hp || 0) - 1);
+  refreshHpControls();
+  drawAll();
+});
+
+hpIncreaseBtn.addEventListener('click', ()=> {
+  if (!activeParticipant || activeParticipant.type !== 'player') return;
+  const maxv = activeParticipant.maxHp || 0;
+  activeParticipant.hp = Math.min(maxv, (activeParticipant.hp || 0) + 1);
+  refreshHpControls();
+  drawAll();
+});
+
+applyHpBtn.addEventListener('click', ()=> {
+  if (!activeParticipant || activeParticipant.type !== 'player') return;
+  const newHp = parseInt(currentHpEl.value);
+  const newMax = parseInt(maxHpControlEl.value);
+  if (!isNaN(newMax)) {
+    activeParticipant.maxHp = Math.max(0, newMax);
+  }
+  if (!isNaN(newHp)) {
+    activeParticipant.hp = Math.max(0, Math.min(activeParticipant.maxHp || newHp, newHp));
+  }
+  refreshHpControls();
+  drawAll();
+});
+
+
+function undoLastMove(){
+  if(moveHistory.length===0) return alert('No movement to undo');
+  const last = moveHistory.pop();
+  if(last.type==='move'){
+    const p = participants.find(pp=>pp.name===last.name);
+    if(p){
+      p.x = last.from.x; p.y = last.from.y; p.hasMoved = false;
+      drawAll(); updateInitiativeList();
+    }
+  }
+}
+
+/* ----------------- DRAW MODE / OBJECTS / SELECT ----------------- */
+drawToolSelect.addEventListener('change', ()=> drawTool = drawToolSelect.value);
+fillShapesToggle.addEventListener('change', ()=> drawAll());
+
+cancelDrawBtn.addEventListener('click', ()=>{ isDrawing=false; currentDrawing=null; drawAll(); });
+clearObjectsBtn.addEventListener('click', ()=>{ if(confirm('Clear all drawn objects?')){ objects=[]; selectedObject=null; selectedObjects=[]; updateSelectedObjectUI(); drawAll(); } });
+
+deleteObjectBtn.addEventListener('click', ()=>{ 
+  if(selectedObjects.length > 0) {
+    objects = objects.filter(o=> !selectedObjects.includes(o.id)); 
+    selectedObjects=[]; 
+    selectedObject=null; 
+    updateSelectedObjectUI(); 
+    drawAll(); 
+  } else if(selectedObject) {
+    objects = objects.filter(o=> o.id !== selectedObject.id); 
+    selectedObject=null; 
+    updateSelectedObjectUI(); 
+    drawAll(); 
+  } else {
+    alert('No object selected');
+  }
+});
+
+toggleDragObjectBtn.addEventListener('click', ()=>{ 
+  if(selectedObjects.length > 0) {
+    objects.forEach(o=>{ if(selectedObjects.includes(o.id)) o.draggable = !o.draggable }); 
+    drawAll(); 
+  } else if(selectedObject) {
+    selectedObject.draggable = !selectedObject.draggable; 
+    updateSelectedObjectUI(); 
+    drawAll(); 
+  } else {
+    alert('No object selected');
+  }
+});
+
+function updateSelectedObjectUI(){
+  if(selectedObjects.length > 1){
+    selectedObjectLabel.textContent = `${selectedObjects.length} objects selected`;
+  } else if(selectedObjects.length === 1 || selectedObject){
+    const obj = selectedObject || objects.find(o => o.id === selectedObjects[0]);
+    if(obj) {
+      selectedObjectLabel.textContent = `${obj.type} (${obj.draggable ? 'unlocked' : 'locked'})`;
+    } else {
+      selectedObjectLabel.textContent = 'None';
+    }
+  } else {
+    selectedObjectLabel.textContent = 'None';
+  }
+}
+
+function refreshHpControls(){
+  if(activeParticipant && activeParticipant.type === 'player'){
+    currentHpEl.value = (activeParticipant.hp !== undefined) ? activeParticipant.hp : '';
+    maxHpControlEl.value = (activeParticipant.maxHp !== undefined) ? activeParticipant.maxHp : '';
+    // enable controls
+    currentHpEl.disabled = false; maxHpControlEl.disabled = false;
+    hpDecreaseBtn.disabled = false; hpIncreaseBtn.disabled = false; applyHpBtn.disabled = false;
+  } else {
+    currentHpEl.value = ''; maxHpControlEl.value = '';
+    currentHpEl.disabled = true; maxHpControlEl.disabled = true;
+    hpDecreaseBtn.disabled = true; hpIncreaseBtn.disabled = true; applyHpBtn.disabled = true;
+  }
+}
+
+
+/* ----------------- BATTLEFIELD SIZE ----------------- */
+setBattleSizeBtn.addEventListener('click', ()=>{
+  const w = parseInt(battleWidthEl.value), h = parseInt(battleHeightEl.value);
+  if(isNaN(w) || isNaN(h) || w<=100 || h<=100) return alert('Enter valid width and height (px)');
+  canvas.width = w; canvas.height = h; drawAll();
+});
+
+/* ----------------- DISTANCE TOOL ----------------- */
+checkDistanceBtn.addEventListener('click', ()=>{
+  const aName = distanceFrom.value; const bName = distanceTo.value;
+  const p1 = participants.find(p=>p.name===aName); const p2 = participants.find(p=>p.name===bName);
+  if(!p1||!p2) return alert('Select two participants');
+const dx = p1.x - p2.x;
+const dy = p1.y - p2.y;
+const centerDist = Math.sqrt(dx*dx + dy*dy);
+
+// per-entity radii (fallback to PARTICLE_RADIUS)
+const r1 = p1.radius || PARTICLE_RADIUS;
+const r2 = p2.radius || PARTICLE_RADIUS;
+
+// edge-to-edge distance between circles
+const distPx = Math.max(0, centerDist - (r1 + r2));
+const distUnits = distPx / pixelsPerUnit;
+
+
+  distanceResult.textContent = `${distUnits.toFixed(2)} units (${distPx.toFixed(0)} px)`;
+});
+
+/* ----------------- CANVAS INTERACTIONS ----------------- */
+canvas.addEventListener('mousedown', (evt)=>{
+  if (evt.button === 2) {
+    return; // right-click does nothing except measurement (handled elsewhere)
+  }
+  const pos = screenToCanvas(evt); isMouseDown=true; mouseDownPos = pos;
+
+  // SHIFT always takes precedence: allow shift-click to toggle selection and shift-drag to rectangle-select.
+  if(evt.shiftKey){
+    const clickedObj = findObjectAt(pos);
+    if(clickedObj){
+      // toggle the clicked object's selection
+      if(selectedObjects.includes(clickedObj.id)){
+        selectedObjects = selectedObjects.filter(id=> id !== clickedObj.id);
+        if(selectedObjects.length === 0) selectedObject = null;
+      } else {
+        selectedObjects.push(clickedObj.id);
+        selectedObject = objects.find(o=>o.id === selectedObjects[0]) || null;
+      }
+      updateSelectedObjectUI(); drawAll();
+      return;
+    }
+    // start selection rectangle
+    selecting = true; selectionRect = { x: pos.x, y: pos.y, w:0, h:0 };
+    drawAll(); return;
+  }
+
+  // Draw mode (without shift): start drawing based on tool
+  if(drawMode){
+    if(drawTool === 'freehand'){
+      isDrawing = true;
+      currentDrawing = { id: 'obj_' + Date.now(), type:'freehand', points:[pos], draggable:true, filled: fillShapesToggle.checked };
+    } else if(drawTool === 'circle'){
+      isDrawing = true;
+      currentDrawing = { id: 'obj_' + Date.now(), type:'circle', x: pos.x, y: pos.y, r:0, draggable:true, filled: fillShapesToggle.checked };
+    } else if(drawTool === 'rect'){
+      isDrawing = true;
+      currentDrawing = { id: 'obj_' + Date.now(), type:'rect', x: pos.x, y: pos.y, w:0, h:0, draggable:true, filled: fillShapesToggle.checked };
+    }
+    drawAll(); return;
+  }
+
+  // Not draw mode and not shift: check object hit
+  const obj = findObjectAt(pos);
+  if(obj){
+    // If user had multiple objects selected and clicked one of them, keep the multi-selection; otherwise select only this one.
+    if(selectedObjects.length > 1 && selectedObjects.includes(obj.id)){
+      // keep selectedObjects as-is
+    } else {
+      selectedObjects = [obj.id];
+    }
+    selectedObject = obj;
+    updateSelectedObjectUI();
+    if(obj.draggable){
+      draggingObjectRef = obj;
+      // compute anchor point of the clicked object (for proper offset)
+      const anchorX = (obj.x !== undefined) ? obj.x : (obj.cx !== undefined ? obj.cx : boundingBoxFor(obj.points).x);
+      const anchorY = (obj.y !== undefined) ? obj.y : (obj.cy !== undefined ? obj.cy : boundingBoxFor(obj.points).y);
+      objectDragOffset.x = pos.x - anchorX;
+      objectDragOffset.y = pos.y - anchorY;
+      if(selectedObjects.length>1){
+        multiDragInitial = selectedObjects.map(id=>{ const o = objects.find(oo=>oo.id===id); const ax = (o.x !== undefined) ? o.x : (o.cx !== undefined ? o.cx : boundingBoxFor(o.points).x); const ay = (o.y !== undefined) ? o.y : (o.cy !== undefined ? o.cy : boundingBoxFor(o.points).y); return {id: id, x: ax, y: ay}; });
+      } else {
+        multiDragInitial = null;
+      }
+    }
+    drawAll(); return;
+  }
+
+  // check participant click
+  const p = findParticipantAt(pos);
+  if(p){
+    activeParticipant = p; updateInitiativeList(); showMoveCircle(); drawAll(); return;
+  }
+
+  // else empty space: attempt to move active participant
+  if(!activeParticipant) { return; }
+
+  moveConfig = moveConfigToggle.checked;
+  if(!moveConfig){
+    if(activeParticipant.hasMoved) { alert('This participant has already moved this turn.'); return; }
+    const current = participants[turnIndex];
+    if(activeParticipant !== current) { /* not allowed */ return; }
+  }
+  const extra = parseInt(moveRangeEl.value) || 0;
+  const rangeUnits = (activeParticipant.speed || 0) + extra;
+const rangePx = rangeUnits * pixelsPerUnit + (activeParticipant.radius || PARTICLE_RADIUS);
+const dx = pos.x - activeParticipant.x; const dy = pos.y - activeParticipant.y;
+const dist = Math.sqrt(dx*dx + dy*dy);
+// allow if center distance <= rangePx (range already includes token radius)
+if(dist <= rangePx || moveConfig){
+    pushMoveHistory({type:'move', name: activeParticipant.name, from:{x: activeParticipant.x, y: activeParticipant.y}, to:{x: pos.x, y: pos.y}});
+    activeParticipant.x = pos.x; activeParticipant.y = pos.y;
+    activeParticipant.hasMoved = true;
+    drawAll(); showMoveCircle();
+  } else {
+    alert('Move is out of range!');
+  }
+});
+
+canvas.addEventListener("wheel", e => {
+  if (!e.shiftKey) return;
+  if (!selectedObject || selectedObjects.length > 1) return;
+
+  const o = selectedObject;
+  if (o.type !== "image") return;
+
+  e.preventDefault();
+
+  const delta = e.deltaY < 0 ? 1.1 : 0.9;
+  o.w *= delta;
+  o.h *= delta;
+
+  drawAll();
+});
+
+
+canvas.addEventListener('mousemove', (evt)=>{
+  const pos = screenToCanvas(evt);
+  // Hover cursor for draggable objects
+  if(!drawMode && !isMouseDown){
+    const obj = findObjectAt(pos);
+    if(obj && obj.draggable){
+      canvas.classList.add('can-drag');
+    } else {
+      canvas.classList.remove('can-drag');
+    }
+  }
+
+  // Drawing preview
+  if(drawMode && isDrawing && currentDrawing){
+    if(currentDrawing.type === 'freehand'){
+      currentDrawing.points.push(pos);
+    } else if(currentDrawing.type === 'circle'){
+      currentDrawing.r = Math.sqrt((pos.x - currentDrawing.x)**2 + (pos.y - currentDrawing.y)**2);
+    } else if(currentDrawing.type === 'rect'){
+      currentDrawing.w = pos.x - currentDrawing.x;
+      currentDrawing.h = pos.y - currentDrawing.y;
+    }
+    drawAll(); drawCurrentPreview(); return;
+  }
+
+  // selection rectangle update
+  if(selecting && selectionRect){
+    selectionRect.w = pos.x - selectionRect.x; selectionRect.h = pos.y - selectionRect.y;
+    drawAll(); drawSelectionRect(); return;
+  }
+
+  // dragging a single object or multi-drag
+  if(draggingObjectRef && isMouseDown){
+    const rx = pos.x - objectDragOffset.x; const ry = pos.y - objectDragOffset.y;
+    if(selectedObjects.length>1 && multiDragInitial){
+      // find initial record for the dragged object (use fallback to first)
+      const initRec = multiDragInitial.find(mi=> mi.id === draggingObjectRef.id) || multiDragInitial[0];
+      const deltaX = rx - initRec.x; const deltaY = ry - initRec.y;
+      selectedObjects.forEach(id=>{
+        const o = objects.find(oo=>oo.id===id);
+        const init = multiDragInitial.find(mi=>mi.id===id);
+        if(!o || !init) return;
+        if(o.type==='freehand'){
+          o.points = o.points.map(pt=>({x: pt.x + deltaX, y: pt.y + deltaY}));
+        } else if(o.type==='circle'){
+          // store cx/cy for circles
+          if(init.x !== undefined){ o.cx = init.x + deltaX; o.cy = init.y + deltaY; o.x = o.cx; o.y = o.cy; }
+        } else if(o.type==='rect'){
+          o.x = init.x + deltaX; o.y = init.y + deltaY;
+        } else if (o.type === 'image') {
+  o.x = init.x + deltaX; o.y = init.y + deltaY;
+}
+      });
+    } else {
+      const o = draggingObjectRef;
+      if(o.type === 'freehand'){
+        const bb = boundingBoxFor(o.points);
+        const dx = rx - bb.x; const dy = ry - bb.y;
+        o.points = o.points.map(pt => ({x: pt.x + dx, y: pt.y + dy}));
+      } else if(o.type === 'circle'){
+        o.cx = rx; o.cy = ry; o.x = rx; o.y = ry;
+} else if(o.type === 'rect'){
+  o.x = rx; o.y = ry;
+} else if (o.type === 'image') {
+  // Move image top-left to match drag anchor
+  o.x = rx; o.y = ry;
+}
+
+    }
+    drawAll(); return;
+  }
+
+  // measuring dynamic
+  if(measuring && measuring.active){
+    measuring.cursorX = pos.x; measuring.cursorY = pos.y;
+    drawAll(); drawMeasurementLine(measuring.entity, {x: pos.x, y: pos.y}); return;
+  }
+});
+
+canvas.addEventListener('mouseup', (evt)=>{
+  isMouseDown=false; mouseDownPos=null;
+  // finish drawing
+  if(drawMode && isDrawing && currentDrawing){
+    if(currentDrawing.type === 'freehand'){
+      objects.push({...currentDrawing});
+    } else if(currentDrawing.type === 'circle'){
+      objects.push({...currentDrawing, cx: currentDrawing.x, cy: currentDrawing.y, r: currentDrawing.r});
+    } else if(currentDrawing.type === 'rect'){
+      objects.push({...currentDrawing});
+    }
+    selectedObject = objects[objects.length-1];
+    selectedObjects = [selectedObject.id];
+    updateSelectedObjectUI();
+    currentDrawing = null; isDrawing = false;
+    drawAll(); return;
+  }
+
+  // finish selection rectangle (SHIFT selection works regardless of drawMode)
+  if(selecting && selectionRect){
+    const rx = Math.min(selectionRect.x, selectionRect.x + selectionRect.w);
+    const ry = Math.min(selectionRect.y, selectionRect.y + selectionRect.h);
+    const rw = Math.abs(selectionRect.w); const rh = Math.abs(selectionRect.h);
+    selectedObjects = [];
+    objects.forEach(o=>{
+      const bb = o.type==='freehand' ? boundingBoxFor(o.points) : (o.type==='rect' ? {x: Math.min(o.x, o.x+o.w), y: Math.min(o.y, o.y+o.h), w: Math.abs(o.w), h: Math.abs(o.h)} : {x:(o.cx||o.x)- (o.r||0), y:(o.cy||o.y)-(o.r||0), w: (o.r||0)*2, h: (o.r||0)*2});
+      if(bb.x + bb.w >= rx && bb.x <= rx+rw && bb.y + bb.h >= ry && bb.y <= ry+rh){
+        selectedObjects.push(o.id);
+      }
+    });
+    selectionRect = null; selecting = false;
+    selectedObject = objects.find(o=> o.id === selectedObjects[0]) || null;
+    updateSelectedObjectUI(); drawAll(); return;
+  }
+
+  if(draggingObjectRef){
+    draggingObjectRef = null; multiDragInitial = null;
+  }
+});
+
+const imageUpload = document.getElementById("imageUpload");
+
+imageUpload.addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.onload = () => {
+    objects.push({
+      id: "img_" + Date.now(),
+      type: "image",
+      img: img,
+      x: 100,
+      y: 100,
+      w: img.width,
+      h: img.height,
+      draggable: true,
+      filled: false
+    });
+    drawAll();
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+
+canvas.addEventListener('mouseleave', ()=>{ isMouseDown=false; isDrawing=false; draggingObjectRef=null; selecting=false; selectionRect=null; drawAll(); });
+
+canvas.addEventListener('contextmenu', (evt)=>{
+  evt.preventDefault();
+  const pos = screenToCanvas(evt);
+  const p = findParticipantAt(pos);
+  if(p){
+    if(measuring && measuring.active && measuring.entity === p){ measuring.active = false; measuring = null; drawAll(); return; }
+    measuring = { entity: p, active: true, cursorX: pos.x, cursorY: pos.y };
+    drawAll(); return;
+  }
+  if(measuring && measuring.active){ measuring.active=false; measuring=null; drawAll(); return; }
+});
+
+/* ----------------- OBJECT / HIT TEST HELPERS ----------------- */
+function findParticipantAt(pos){
+  for(const p of participants){
+    if (Math.sqrt((pos.x-p.x)**2 + (pos.y-p.y)**2) <= (p.radius || PARTICLE_RADIUS))
+ return p;
+  }
+  return null;
+}
+
+function boundingBoxFor(points){
+  const xs = points.map(pt => pt.x); const ys = points.map(pt => pt.y);
+  const minx = Math.min(...xs), miny = Math.min(...ys);
+  return {x:minx,y:miny,w:Math.max(...xs)-minx,h:Math.max(...ys)-miny};
+}
+
+function findObjectAt(pos){
+  for(let i = objects.length-1; i>=0; i--){
+    const o = objects[i];
+if(o.type === 'rect'){
+  const x = o.x; const y = o.y; const w = o.w; const h = o.h;
+  const rx = Math.min(x, x + w), ry = Math.min(y, y + h), rw = Math.abs(w), rh = Math.abs(h);
+  if(pos.x >= rx && pos.x <= rx+rw && pos.y >= ry && pos.y <= ry+rh) return o;
+} else if(o.type === 'circle'){
+  const cx = o.cx !== undefined ? o.cx : o.x; const cy = o.cy !== undefined ? o.cy : o.y;
+  const r = o.r || 0;
+  const dist = Math.sqrt((pos.x-cx)**2 + (pos.y-cy)**2);
+  if(o.filled){
+    if(dist <= r) return o; // Click anywhere inside filled circle
+  } else {
+    if(Math.abs(dist - r) < 6) return o; // Click near the outline
+  }
+} else if (o.type === "image") {
+  if (pos.x >= o.x && pos.x <= o.x + o.w &&
+      pos.y >= o.y && pos.y <= o.y + o.h) {
+    return o;
+  }
+} else if(o.type === 'freehand'){
+      const bb = boundingBoxFor(o.points);
+      if(pos.x < bb.x-6 || pos.x > bb.x+bb.w+6 || pos.y < bb.y-6 || pos.y > bb.y+bb.h+6) continue;
+      for(let k=0;k<o.points.length-1;k++){
+        const p1 = o.points[k], p2 = o.points[k+1];
+        const d = pointToSegmentDistance(pos, p1, p2);
+        if(d < 6) return o;
+      }
+    } 
+  }
+  return null;
+}
+
+function pointToSegmentDistance(pt, a, b){
+  const vx = b.x - a.x, vy = b.y - a.y;
+  const wx = pt.x - a.x, wy = pt.y - a.y;
+  const c1 = vx*wx + vy*wy;
+  if(c1 <= 0) return Math.sqrt((pt.x-a.x)**2 + (pt.y-a.y)**2);
+  const c2 = vx*vx + vy*vy;
+  if(c2 <= c1) return Math.sqrt((pt.x-b.x)**2 + (pt.y-b.y)**2);
+  const t = c1 / c2;
+  const projx = a.x + t*vx, projy = a.y + t*vy;
+  return Math.sqrt((pt.x-projx)**2 + (pt.y-projy)**2);
+}
+
+/* ----------------- DRAWING ----------------- */
+function drawAll(){
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  drawGrid();
+  objects.forEach(o=> drawObject(o, selectedObjects.includes(o.id) || (selectedObject && selectedObject.id === o.id)));
+  if(selectionRect) drawSelectionRect();
+  participants.forEach(p=>{
+    ctx.save();
+    ctx.lineWidth = (p===activeParticipant) ? 3 : 1;
+    ctx.strokeStyle = (p===activeParticipant) ? 'gold' : 'black';
+    ctx.fillStyle = p.color || (p.type === 'player' ? '#4f6ef6' : '#f05b5b');
+    const pr = p.radius || PARTICLE_RADIUS;
+ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.restore();
+    ctx.fillStyle='black'; ctx.font='13px sans-serif';
+ctx.fillText(p.name, p.x - 18, p.y - 22);
+if (p.type === 'player' && p.maxHp !== undefined) {
+  ctx.fillStyle = (p.hp <= 0) ? 'red' : 'black';
+  ctx.font = '12px sans-serif';
+  ctx.fillText(`${p.hp}/${p.maxHp} HP`, p.x - 18, p.y - 34);
+}
+if(p.hasMoved){ ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.font='11px sans-serif'; ctx.fillText('moved', p.x-12, p.y+36); }
+  });
+  // Always show move-range for currently selected/active participant
+if (activeParticipant) {
+  const extra = parseInt(moveRangeEl.value) || 0;
+  const rangeUnits = (activeParticipant.speed || 0) + extra;
+
+  // EDGE-TO-EDGE MOVEMENT RANGE (use entity radius if available)
+const rangePx = rangeUnits * pixelsPerUnit + (activeParticipant.radius || PARTICLE_RADIUS);
+
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(34,197,94,0.95)';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.arc(activeParticipant.x, activeParticipant.y, rangePx, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+  if(measuring && measuring.active){
+    drawMeasurementLine(measuring.entity, {x: measuring.cursorX, y: measuring.cursorY});
+  }
+}
+
+function drawGrid(){
+  ctx.save();
+  ctx.strokeStyle='rgba(0,0,0,0.03)'; ctx.lineWidth=1;
+  const step = pixelsPerUnit;
+  for(let x=0;x<canvas.width;x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+  for(let y=0;y<canvas.height;y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawObject(o, highlight=false){
+  ctx.save(); ctx.lineWidth = highlight ? 2.5 : 1.2; ctx.strokeStyle = highlight ? 'orange' : 'black';
+ctx.fillStyle = o.filled ? 'rgba(100,150,255,0.75)' : 'rgba(200,200,200,0.06)';
+  if(o.type === 'rect'){
+    const rx = Math.min(o.x, o.x + o.w), ry = Math.min(o.y, o.y + o.h), rw = Math.abs(o.w), rh = Math.abs(o.h);
+    ctx.beginPath(); ctx.rect(rx, ry, rw, rh); if(o.filled) ctx.fill(); ctx.stroke();
+  } else if(o.type === 'circle'){
+    const cx = o.cx !== undefined ? o.cx : o.x, cy = o.cy !== undefined ? o.cy : o.y, r = o.r || 0;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); if(o.filled) ctx.fill(); ctx.stroke();
+  } else if(o.type === 'freehand'){
+    ctx.beginPath(); for(let i=0;i<o.points.length;i++){ const p = o.points[i]; if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); } ctx.stroke();
+    if(o.filled){ ctx.beginPath(); for(let i=0;i<o.points.length;i++){ const p=o.points[i]; if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); } ctx.closePath(); ctx.fill(); }
+  } else if (o.type === "image") {
+  ctx.drawImage(o.img, o.x, o.y, o.w, o.h);
+
+  if (highlight) {
+    ctx.save();
+    ctx.strokeStyle = "orange";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(o.x, o.y, o.w, o.h);
+    ctx.restore();
+  }
+
+  ctx.restore();
+  return;
+}
+
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.font='11px sans-serif';
+  ctx.fillText(o.id, (o.x||o.cx||0)+6, (o.y||o.cy||0)-6);
+  ctx.restore();
+}
+
+function drawCurrentPreview(){
+  if(!currentDrawing) return;
+  const o = currentDrawing;
+  ctx.save();
+  ctx.setLineDash([6,4]); ctx.lineWidth=2; ctx.strokeStyle='teal'; ctx.fillStyle='rgba(0,128,128,0.08)';
+  if(o.type === 'freehand'){ ctx.beginPath(); for(let i=0;i<o.points.length;i++){ const p=o.points[i]; if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); } ctx.stroke(); }
+  else if(o.type === 'circle'){ ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); if(o.filled) ctx.fill(); ctx.stroke(); }
+  else if(o.type === 'rect'){ ctx.beginPath(); ctx.rect(o.x,o.y,o.w,o.h); if(o.filled) ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawSelectionRect(){
+  if(!selectionRect) return;
+  ctx.save();
+  ctx.setLineDash([6,4]); ctx.lineWidth=2; ctx.strokeStyle='blue'; ctx.fillStyle='rgba(0,0,255,0.06)';
+  const rx = Math.min(selectionRect.x, selectionRect.x + selectionRect.w);
+  const ry = Math.min(selectionRect.y, selectionRect.y + selectionRect.h);
+  const rw = Math.abs(selectionRect.w); const rh = Math.abs(selectionRect.h);
+  ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.fill(); ctx.stroke(); ctx.restore();
+}
+
+function drawMeasurementLine(entity, cursor){
+  if(!entity) return;
+  ctx.save();
+  ctx.lineWidth=2; ctx.strokeStyle='purple';
+const dx = cursor.x - entity.x, dy = cursor.y - entity.y;
+const centerDist = Math.sqrt(dx*dx + dy*dy);
+const er = (entity.radius || PARTICLE_RADIUS);
+
+// edge-to-cursor distance
+const px = Math.max(0, centerDist - er);
+const units = px / pixelsPerUnit;
+
+// compute start point on the entity edge (avoid NaN if centerDist===0)
+let startX = entity.x, startY = entity.y;
+if (centerDist > 0) {
+  startX = entity.x + (dx / centerDist) * er;
+  startY = entity.y + (dy / centerDist) * er;
+}
+
+ctx.beginPath();
+ctx.moveTo(startX, startY);
+ctx.lineTo(cursor.x, cursor.y);
+ctx.stroke();
+
+ctx.fillText(`${units.toFixed(2)} units (${px.toFixed(0)} px)`, (startX + cursor.x)/2 + 8, (startY + cursor.y)/2 + 8);
+
+  ctx.restore();
+}
+
+/* ----------------- INIT / SAVE / LOAD ----------------- */
+function normalizeStoredObjects(){
+  objects.forEach(o=>{
+    if(o.type==='circle'){ o.cx = o.cx || o.x; o.cy = o.cy || o.y; }
+    if(o.type==='rect'){ o.w = o.w || 0; o.h = o.h || 0; }
+    o.draggable = o.draggable === undefined ? true : o.draggable;
+    o.filled = o.filled === undefined ? false : o.filled;
+  });
+}
+
+function init(){ normalizeStoredObjects(); drawAll(); }
+init();
+
+// simple save/load
+window.saveState = ()=>{ localStorage.setItem('ttrpg_sim_state_v2', JSON.stringify({participants, objects})); alert('Saved to localStorage'); };
+window.loadState = ()=>{ const s = localStorage.getItem('ttrpg_sim_state_v2'); if(!s) return alert('No save'); const parsed = JSON.parse(s); participants = parsed.participants || []; objects = parsed.objects || []; normalizeStoredObjects(); updateInitiativeList(); drawAll(); alert('Loaded'); };
+
+/* ----------------- INITIATIVE DRAG & DROP ----------------- */
+function enableInitiativeDnD(){
+  const items = initiativeOrder.querySelectorAll('.initiative-item');
+  items.forEach(item=>{
+    item.addEventListener('dragstart', (e)=>{
+      e.dataTransfer.setData('text/plain', item.dataset.index);
+      item.style.opacity = '0.4';
+    });
+    item.addEventListener('dragend', (e)=>{ item.style.opacity='1'; });
+    item.addEventListener('dragover', (e)=> e.preventDefault());
+    item.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIndex = parseInt(item.dataset.index);
+      if(isNaN(fromIndex) || isNaN(toIndex)) return;
+      const [moved] = participants.splice(fromIndex,1);
+      participants.splice(toIndex,0,moved);
+      if(activeParticipant){
+        turnIndex = participants.indexOf(activeParticipant);
+        if(turnIndex === -1) turnIndex = 0;
+      }
+      updateInitiativeList(); drawAll();
+    });
+  });
+}
+
+/* ----------------- FINAL NOTES ----------------- */
+updateInitiativeList();
+
+</script>
+</body>
+</html>
