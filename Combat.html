@@ -289,6 +289,45 @@
   .ir-add-item-row{display:flex;gap:3px;margin-top:2px}
   .ir-add-item-row button{padding:3px 7px;font-size:11px;width:auto;flex-shrink:0}
 
+  /* ENEMY DETAILS VIEWER MODAL */
+  #enemyDetailsModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center}
+  #enemyDetailsModal.open{display:flex}
+  #enemyDetailsBox{background:var(--surface);border:1px solid var(--border);border-radius:13px;width:520px;max-width:92vw;max-height:76vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.85);overflow:hidden}
+  #enemyDetailsHeader{padding:14px 18px 12px;background:linear-gradient(135deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;flex-shrink:0}
+  #enemyDetailsTitleWrap{flex:1;min-width:0}
+  #enemyDetailsTitle{font-family:'Cinzel',serif;font-size:15px;font-weight:700;color:var(--accent2);letter-spacing:.5px}
+  #enemyDetailsSubtitle{font-size:11px;color:var(--text-muted);margin-top:2px}
+  #enemyDetailsClose{background:rgba(255,255,255,.06);border:none;color:var(--text-muted);border-radius:5px;padding:4px 9px;cursor:pointer;font-size:14px;width:auto;flex-shrink:0;transition:all .15s}
+  #enemyDetailsClose:hover{color:var(--text);background:rgba(255,255,255,.12);transform:none;filter:none}
+  #enemyDetailsBody{padding:18px 20px;overflow-y:auto;flex:1;font-size:13px;line-height:1.75;color:var(--text);font-family:'Source Sans 3',sans-serif;background:rgba(0,0,0,.15)}
+  #enemyDetailsBody::-webkit-scrollbar{width:4px}
+  #enemyDetailsBody::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  .detail-section{margin-bottom:12px}
+  .detail-section-title{font-family:'Cinzel',serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+  .detail-section-title.weaknesses{color:#f87171}
+  .detail-section-title.resistances{color:#60a5fa}
+  .detail-section-title.immunities{color:#4ade80}
+  .detail-section-title.tactics{color:#fb923c}
+  .detail-section-title.notes{color:var(--text-muted)}
+  .detail-section-text{white-space:pre-wrap;color:var(--text);font-size:13px;line-height:1.6}
+
+  /* WIKI TEMPLATE SELECTOR */
+  #wikiTemplateSelector{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center}
+  #wikiTemplateSelector.open{display:flex}
+  #wikiTemplateSelectorBox{background:var(--surface);border:1px solid var(--border);border-radius:13px;width:400px;max-width:92vw;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.85);overflow:hidden}
+  #wikiTemplateSelectorHeader{padding:14px 18px 12px;background:linear-gradient(135deg,#0f3460,#16213e);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+  #wikiTemplateSelectorHeader h3{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--accent2);flex:1}
+  #wikiTemplateSelectorClose{background:rgba(255,255,255,.06);border:none;color:var(--text-muted);border-radius:5px;padding:4px 9px;cursor:pointer;font-size:14px;width:auto;flex-shrink:0}
+  #wikiTemplateSelectorClose:hover{color:var(--text);background:rgba(255,255,255,.12);transform:none;filter:none}
+  #wikiTemplateList{flex:1;overflow-y:auto;padding:10px}
+  #wikiTemplateList::-webkit-scrollbar{width:4px}
+  #wikiTemplateList::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  .wiki-template-item{padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all .15s}
+  .wiki-template-item:hover{background:rgba(245,166,35,.08);border-color:rgba(245,166,35,.3)}
+  .wiki-template-name{font-weight:600;font-size:13px;color:var(--accent2)}
+  .wiki-template-info{font-size:11px;color:var(--text-muted);margin-top:2px}
+  input.wiki-import-file{display:none}
+
 </style>
 </head>
 <body>
@@ -326,6 +365,7 @@
             <div><label class="field-label">Initiative</label><input id="initiative" type="number" placeholder="0" /></div>
             <div><label class="field-label">Speed (units)</label><input id="movespeed" type="number" placeholder="30" /></div>
             <div><label class="field-label">Max HP</label><input id="createMaxHp" type="number" placeholder="0" /></div>
+            <div><label class="field-label" style="color:#a78bfa">Max Sanity</label><input id="createMaxSanity" type="number" placeholder="0" /></div>
           </div>
           <div><label class="field-label">Type &amp; Color</label>
             <div class="row">
@@ -349,6 +389,11 @@
           <div><label class="field-label">Token Radius (px)</label><input id="tokenSize" type="number" value="15" /></div>
           <button id="addBtn" class="btn-success">➕ Add Character</button>
 
+          <div class="panel-title" style="margin-top:4px">Wiki Templates</div>
+          <button id="importWikiBtn" class="btn-secondary">📥 Import Wiki Enemies</button>
+          <input type="file" id="wikiImportFile" class="wiki-import-file" accept=".json" />
+          <div id="wikiTemplateCount" class="small" style="text-align:center;min-height:16px"></div>
+
           <div class="panel-title" style="margin-top:4px">Battlefield</div>
           <div class="row">
             <div><label class="field-label">Width (px)</label><input id="battleWidth" type="number" value="900" /></div>
@@ -370,6 +415,18 @@
             <button id="hpDecrease" class="btn-danger btn-small">− HP</button>
             <button id="hpIncrease" class="btn-success btn-small">+ HP</button>
             <button id="applyHp" class="btn-primary btn-small">✓ Apply</button>
+          </div>
+
+          <div class="panel-title" style="margin-top:4px;color:#a78bfa">Sanity — Selected Token</div>
+          <div id="selectedSanityName"></div>
+          <div class="row">
+            <div><label class="field-label" style="color:#a78bfa">Current Sanity</label><input id="currentSanity" type="number" placeholder="—" /></div>
+            <div><label class="field-label" style="color:#a78bfa">Max Sanity</label><input id="maxSanityControl" type="number" placeholder="—" /></div>
+          </div>
+          <div class="row">
+            <button id="sanityDecrease" class="btn-danger btn-small">− San</button>
+            <button id="sanityIncrease" class="btn-success btn-small">+ San</button>
+            <button id="applySanity" class="btn-primary btn-small">✓ Apply</button>
           </div>
 
           <div class="panel-title" style="margin-top:4px">Movement</div>
@@ -609,6 +666,10 @@
       <div><label class="field-label">Current HP</label><input id="editHp" type="number" /></div>
       <div><label class="field-label">Color</label><input id="editColor" type="color" /></div>
     </div>
+    <div class="row">
+      <div><label class="field-label" style="color:#a78bfa">Max Sanity</label><input id="editMaxSanity" type="number" /></div>
+      <div><label class="field-label" style="color:#a78bfa">Current Sanity</label><input id="editSanity" type="number" /></div>
+    </div>
     <div class="portrait-picker" style="margin-top:2px">
       <div id="editPortraitPreview" class="portrait-preview">No portrait</div>
       <div class="portrait-actions">
@@ -683,6 +744,8 @@
   <div id="canvasCtxNewEntity" class="ctx-action" style="color:var(--text)"><span class="ctx-item-icon">🧙</span><span>Create New Entity…</span></div>
   <div id="canvasCtxQuickPlayer" class="ctx-action" style="color:var(--text)"><span class="ctx-item-icon">🛡</span><span>Quick Player <span style="opacity:.55;font-size:11px">(5 in all)</span></span></div>
   <div id="canvasCtxQuickEnemy" class="ctx-action" style="color:var(--text)"><span class="ctx-item-icon">⚔</span><span>Quick Enemy <span style="opacity:.55;font-size:11px">(5 in all)</span></span></div>
+  <div class="ctx-divider"></div>
+  <div id="canvasCtxFromTemplate" class="ctx-action" style="color:var(--text)"><span class="ctx-item-icon">📖</span><span>Spawn from Wiki Template</span></div>
 </div>
 
 <!-- ITEM VIEWER MODAL -->
@@ -696,6 +759,31 @@
       <button id="itemViewerClose">✕</button>
     </div>
     <div id="itemViewerBody"></div>
+  </div>
+</div>
+
+<!-- ENEMY DETAILS MODAL (host only) -->
+<div id="enemyDetailsModal">
+  <div id="enemyDetailsBox">
+    <div id="enemyDetailsHeader">
+      <div id="enemyDetailsTitleWrap">
+        <div id="enemyDetailsTitle">—</div>
+        <div id="enemyDetailsSubtitle">—</div>
+      </div>
+      <button id="enemyDetailsClose">✕</button>
+    </div>
+    <div id="enemyDetailsBody"></div>
+  </div>
+</div>
+
+<!-- WIKI TEMPLATE SELECTOR MODAL -->
+<div id="wikiTemplateSelector">
+  <div id="wikiTemplateSelectorBox">
+    <div id="wikiTemplateSelectorHeader">
+      <h3>📖 Select Enemy Template</h3>
+      <button id="wikiTemplateSelectorClose">✕</button>
+    </div>
+    <div id="wikiTemplateList"></div>
   </div>
 </div>
 
@@ -799,12 +887,16 @@ const currentTurnBanner=document.getElementById('currentTurnBanner'), currentTur
 const nameEl=document.getElementById('name'), initiativeEl=document.getElementById('initiative'), movespeedEl=document.getElementById('movespeed');
 const typeEl=document.getElementById('type'), tokenColorEl=document.getElementById('tokenColor'), tokenSizeEl=document.getElementById('tokenSize');
 const createMaxHpEl=document.getElementById('createMaxHp'), addBtn=document.getElementById('addBtn');
+const createMaxSanityEl=document.getElementById('createMaxSanity');
 const startBtn=document.getElementById('startBtn'), nextBtn=document.getElementById('nextBtn');
 const moveRangeEl=document.getElementById('moveRange'), showMoveBtn=document.getElementById('showMoveBtn');
 const moveConfigToggle=document.getElementById('moveConfigToggle'), undoMoveBtn=document.getElementById('undoMoveBtn');
 const currentHpEl=document.getElementById('currentHp'), maxHpControlEl=document.getElementById('maxHpControl');
 const hpDecreaseBtn=document.getElementById('hpDecrease'), hpIncreaseBtn=document.getElementById('hpIncrease'), applyHpBtn=document.getElementById('applyHp');
 const selectedHpNameEl=document.getElementById('selectedHpName');
+const currentSanityEl=document.getElementById('currentSanity'), maxSanityControlEl=document.getElementById('maxSanityControl');
+const sanityDecreaseBtn=document.getElementById('sanityDecrease'), sanityIncreaseBtn=document.getElementById('sanityIncrease'), applySanityBtn=document.getElementById('applySanity');
+const selectedSanityNameEl=document.getElementById('selectedSanityName');
 const drawToolSelect=document.getElementById('drawTool'), fillShapesToggle=document.getElementById('fillShapesToggle');
 const cancelDrawBtn=document.getElementById('cancelDraw'), clearObjectsBtn=document.getElementById('clearObjects');
 const selectedObjectLabel=document.getElementById('selectedObjectLabel'), deleteObjectBtn=document.getElementById('deleteObject'), toggleDragObjectBtn=document.getElementById('toggleDragObject');
@@ -1478,15 +1570,16 @@ if(isHost){
     const n=nameEl.value.trim(),ini=parseInt(initiativeEl.value);
     if(!n||isNaN(ini))return alert('Enter a valid name and initiative.');
     let maxHp=parseInt(createMaxHpEl.value);if(isNaN(maxHp))maxHp=undefined;
+    let maxSanity=parseInt(createMaxSanityEl.value);if(isNaN(maxSanity))maxSanity=undefined;
     participants.push({
       id:'p_'+Date.now()+'_'+Math.floor(Math.random()*1000),
       name:n,initiative:ini,type:typeEl.value,speed:parseInt(movespeedEl.value)||0,
       color:tokenColorEl.value,radius:Math.max(5,parseInt(tokenSizeEl.value)||PARTICLE_RADIUS),
       avatar:pendingNewPortrait||'',
       x:Math.random()*(canvas.width-160)+80,y:Math.random()*(canvas.height-120)+60,
-      movedUnits:0, maxHp,hp:maxHp,assignedTo:null,pingUntil:null,items:[],spriteFacing:1
+      movedUnits:0, maxHp,hp:maxHp, maxSanity,sanity:maxSanity,assignedTo:null,pingUntil:null,items:[],spriteFacing:1
     });
-    nameEl.value='';initiativeEl.value='';movespeedEl.value='';createMaxHpEl.value='';
+    nameEl.value='';initiativeEl.value='';movespeedEl.value='';createMaxHpEl.value='';createMaxSanityEl.value='';
     setPendingNewPortrait('');
     updateInitiativeList();renderAssignmentList();drawAll();syncToServer();
   });
@@ -1515,9 +1608,12 @@ if(isHost){
   });
 
   // HP
-  hpDecreaseBtn.addEventListener('click',()=>{if(!activeParticipant)return;activeParticipant.hp=Math.max(0,(activeParticipant.hp||0)-1);refreshHpControls();updateInitiativeList();drawAll();syncToServer();});
+  hpDecreaseBtn.addEventListener('click',()=>{if(!activeParticipant)return;activeParticipant.hp=Math.max(0,(activeParticipant.hp||0)-1);refreshHpControls();updateInitiativeList();drawAll();syncToServer();checkZeroAndOfferRemoval(activeParticipant);});
   hpIncreaseBtn.addEventListener('click',()=>{if(!activeParticipant)return;const m=activeParticipant.maxHp;activeParticipant.hp=m!==undefined?Math.min(m,(activeParticipant.hp||0)+1):(activeParticipant.hp||0)+1;refreshHpControls();updateInitiativeList();drawAll();syncToServer();});
-  applyHpBtn.addEventListener('click',()=>{if(!activeParticipant)return;const nh=parseInt(currentHpEl.value),nm=parseInt(maxHpControlEl.value);if(!isNaN(nm))activeParticipant.maxHp=Math.max(0,nm);if(!isNaN(nh))activeParticipant.hp=Math.max(0,Math.min(activeParticipant.maxHp!==undefined?activeParticipant.maxHp:nh,nh));refreshHpControls();updateInitiativeList();drawAll();syncToServer();});
+  applyHpBtn.addEventListener('click',()=>{if(!activeParticipant)return;const nh=parseInt(currentHpEl.value),nm=parseInt(maxHpControlEl.value);if(!isNaN(nm))activeParticipant.maxHp=Math.max(0,nm);if(!isNaN(nh))activeParticipant.hp=Math.max(0,Math.min(activeParticipant.maxHp!==undefined?activeParticipant.maxHp:nh,nh));refreshHpControls();updateInitiativeList();drawAll();syncToServer();checkZeroAndOfferRemoval(activeParticipant);});
+  sanityDecreaseBtn.addEventListener('click',()=>{if(!activeParticipant)return;activeParticipant.sanity=Math.max(0,(activeParticipant.sanity||0)-1);refreshHpControls();updateInitiativeList();drawAll();syncToServer();checkZeroAndOfferRemoval(activeParticipant);});
+  sanityIncreaseBtn.addEventListener('click',()=>{if(!activeParticipant)return;const m=activeParticipant.maxSanity;activeParticipant.sanity=m!==undefined?Math.min(m,(activeParticipant.sanity||0)+1):(activeParticipant.sanity||0)+1;refreshHpControls();updateInitiativeList();drawAll();syncToServer();});
+  applySanityBtn.addEventListener('click',()=>{if(!activeParticipant)return;const ns=parseInt(currentSanityEl.value),nms=parseInt(maxSanityControlEl.value);if(!isNaN(nms))activeParticipant.maxSanity=Math.max(0,nms);if(!isNaN(ns))activeParticipant.sanity=Math.max(0,Math.min(activeParticipant.maxSanity!==undefined?activeParticipant.maxSanity:ns,ns));refreshHpControls();updateInitiativeList();drawAll();syncToServer();checkZeroAndOfferRemoval(activeParticipant);});
 
   // Movement
   showMoveBtn.addEventListener('click',drawAll);
@@ -1627,6 +1723,8 @@ function openEditModal(p){
   document.getElementById('editRadius').value=p.radius||PARTICLE_RADIUS;
   document.getElementById('editMaxHp').value=p.maxHp??'';
   document.getElementById('editHp').value=p.hp??'';
+  document.getElementById('editMaxSanity').value=p.maxSanity??'';
+  document.getElementById('editSanity').value=p.sanity??'';
   document.getElementById('editColor').value=p.color||'#6366f1';
   renderPortraitPreview(editPortraitPreview, pendingEditPortrait);
   editModal.classList.add('open');
@@ -1644,8 +1742,12 @@ if(isHost){
     const nm=parseInt(document.getElementById('editMaxHp').value),nh=parseInt(document.getElementById('editHp').value);
     if(!isNaN(nm))p.maxHp=Math.max(0,nm);
     if(!isNaN(nh))p.hp=Math.max(0,Math.min(p.maxHp!==undefined?p.maxHp:nh,nh));
+    const nms=parseInt(document.getElementById('editMaxSanity').value),nsa=parseInt(document.getElementById('editSanity').value);
+    if(!isNaN(nms))p.maxSanity=Math.max(0,nms);
+    if(!isNaN(nsa))p.sanity=Math.max(0,Math.min(p.maxSanity!==undefined?p.maxSanity:nsa,nsa));
     editModal.classList.remove('open');editingParticipant=null;
     updateInitiativeList();refreshHpControls();drawAll();syncToServer();
+    checkZeroAndOfferRemoval(p);
   });
   document.getElementById('editCancel').addEventListener('click',()=>{editModal.classList.remove('open');editingParticipant=null;pendingEditPortrait=null;});
   document.getElementById('clearEditPortrait').addEventListener('click',()=>{pendingEditPortrait='';renderPortraitPreview(editPortraitPreview,'');});
@@ -1655,6 +1757,23 @@ if(isHost){
 /* ================================================================
    REMOVE PARTICIPANT
 ================================================================ */
+function checkZeroAndOfferRemoval(p){
+  if(!isHost)return;
+  const hpZero=p.maxHp!==undefined&&(p.hp??0)<=0;
+  const sanZero=p.maxSanity!==undefined&&(p.sanity??0)<=0;
+  if(!hpZero&&!sanZero)return;
+  const reason=hpZero&&sanZero?'HP and Sanity are both 0':(hpZero?'HP is 0':'Sanity is 0');
+  setTimeout(()=>{
+    if(confirm(`${p.name}'s ${reason}. Remove from combat?`)){
+      if(measuring&&measuring.entity===p)measuring=null;
+      participants=participants.filter(pp=>pp!==p);
+      if(activeParticipant===p)activeParticipant=null;
+      if(turnIndex>=participants.length)turnIndex=Math.max(0,participants.length-1);
+      if(participants.length&&!activeParticipant)activeParticipant=participants[turnIndex]||null;
+      updateInitiativeList();refreshHpControls();renderAssignmentList();drawAll();syncToServer();
+    }
+  },50);
+}
 function removeParticipant(p){
   if(!confirm(`Remove "${p.name}" from combat?`))return;
   if(measuring&&measuring.entity===p)measuring=null;
@@ -1716,6 +1835,18 @@ function updateInitiativeList(){
     } else {
       const st=document.createElement('div');st.className='rhp';st.style.color='var(--text-muted)';
       st.textContent=`Init:${p.initiative}`;info.appendChild(st);
+    }
+
+    // Sanity
+    const san=p.sanity??0,maxSan=p.maxSanity;
+    if(maxSan!==undefined){
+      const sanRatio=maxSan?Math.max(0,Math.min(1,san/maxSan)):0;
+      const sanColor=san<=0?'#f87171':(sanRatio<0.3?'#f5a623':'#a78bfa');
+      const sanDiv=document.createElement('div');sanDiv.className='rhp';sanDiv.style.color=sanColor;
+      sanDiv.textContent=`${san}/${maxSan} Sanity`;
+      const sbar=document.createElement('div');sbar.className='hpbar';
+      const sfill=document.createElement('div');sfill.className='hpbar-fill';sfill.style.width=(sanRatio*100)+'%';sfill.style.background=sanColor;
+      sbar.appendChild(sfill);info.appendChild(sanDiv);info.appendChild(sbar);
     }
 
     // Movement remaining
@@ -1822,6 +1953,8 @@ function updateRightInitiative(){
       bar.appendChild(fill);info.appendChild(hpDiv);info.appendChild(bar);
     }
 
+    // Sanity hidden from guests
+
     // Remaining movement only for own token
     if(isMyToken&&speed>0){
       const mDiv=document.createElement('div');mDiv.className='rmov';mDiv.style.color=movColor;
@@ -1875,12 +2008,17 @@ function refreshHpControls(){
   if(!isHost)return;
   const ok=!!activeParticipant;
   [currentHpEl,maxHpControlEl,hpDecreaseBtn,hpIncreaseBtn,applyHpBtn].forEach(el=>el.disabled=!ok);
+  [currentSanityEl,maxSanityControlEl,sanityDecreaseBtn,sanityIncreaseBtn,applySanityBtn].forEach(el=>el.disabled=!ok);
   if(ok){
     currentHpEl.value=activeParticipant.hp??'';maxHpControlEl.value=activeParticipant.maxHp??'';
+    currentSanityEl.value=activeParticipant.sanity??'';maxSanityControlEl.value=activeParticipant.maxSanity??'';
     selectedHpNameEl.style.display='block';
     selectedHpNameEl.textContent=`${activeParticipant.name} ${activeParticipant.type==='player'?'🛡':'⚔'}`;
+    selectedSanityNameEl.style.display='block';
+    selectedSanityNameEl.textContent=`${activeParticipant.name} ${activeParticipant.type==='player'?'🛡':'⚔'}`;
   } else {
     currentHpEl.value='';maxHpControlEl.value='';selectedHpNameEl.style.display='none';
+    currentSanityEl.value='';maxSanityControlEl.value='';selectedSanityNameEl.style.display='none';
   }
 }
 
@@ -2115,7 +2253,9 @@ function drawParticipants(){
 
     if(isHost){
       ctx.fillStyle='#e8e8f0';ctx.fillText(p.name,px,py-pr-6);
-      if(p.maxHp!==undefined){ctx.font='11px Source Sans 3, sans-serif';ctx.fillStyle=(p.hp??0)<=0?'#f87171':'#4ade80';ctx.fillText(`${p.hp??'?'}/${p.maxHp} HP`,px,py-pr-18);}
+      let hostLabelY=py-pr-18;
+      if(p.maxHp!==undefined){ctx.font='11px Source Sans 3, sans-serif';ctx.fillStyle=(p.hp??0)<=0?'#f87171':'#4ade80';ctx.fillText(`${p.hp??'?'}/${p.maxHp} HP`,px,hostLabelY);hostLabelY-=12;}
+      if(p.maxSanity!==undefined){ctx.font='11px Source Sans 3, sans-serif';const sr=(p.sanity??0)/p.maxSanity;ctx.fillStyle=(p.sanity??0)<=0?'#f87171':(sr<0.3?'#f5a623':'#a78bfa');ctx.fillText(`${p.sanity??'?'}/${p.maxSanity} San`,px,hostLabelY);}
     } else {
       const label=guestDisplayName(p);
       if(label){ctx.fillStyle='#e8e8f0';ctx.fillText(label,px,py-pr-6);}
@@ -3085,19 +3225,40 @@ function showItemContextMenu(p,clientX,clientY){
     dmgAct.innerHTML='<span>⚔️</span><span>Damage Entity</span>';
     dmgAct.addEventListener('click',()=>{
       closeItemContextMenu();
-      const raw=prompt('Enter damage amount:');
+      const dmgType=prompt('Damage type? (phys / mill / both):','phys');
+      if(dmgType===null)return;
+      const dt=dmgType.trim().toLowerCase();
+      const isMill=dt==='mill';
+      const isBoth=dt==='both';
+      const raw=prompt(`Enter ${isBoth?'both':isMill?'mill':'phys'} damage amount:`);
       if(raw===null)return;
       const dmg=parseInt(raw,10);
       if(isNaN(dmg)||dmg<=0)return;
-      p.hp=Math.max(0,(p.hp||0)-dmg);
+      if(isBoth){
+        p.hp=Math.max(0,(p.hp||0)-dmg);
+        p.sanity=Math.max(0,(p.sanity||0)-dmg);
+      } else if(isMill){
+        p.sanity=Math.max(0,(p.sanity||0)-dmg);
+      } else {
+        p.hp=Math.max(0,(p.hp||0)-dmg);
+      }
       if(p.type==='player'){
         damageAnimations.set(p.id,{start:performance.now()});
       }
       screenShakeUntil=performance.now()+350;
       startAnimLoop();
       updateInitiativeList();refreshHpControls();drawAll();syncToServer();
+      checkZeroAndOfferRemoval(p);
     });
     actions.appendChild(dmgAct);
+    // View Details (wiki data)
+    const detAct=document.createElement('div');detAct.className='ctx-action';
+    detAct.innerHTML='<span>📖</span><span>View Details</span>';
+    detAct.addEventListener('click',()=>{
+      closeItemContextMenu();
+      openEnemyDetails(p);
+    });
+    actions.appendChild(detAct);
   }
 
   // Position & show
@@ -3118,7 +3279,7 @@ document.addEventListener('mousedown',e=>{
   if(ccm&&ccm.style.display!=='none'&&!ccm.contains(e.target))closeCanvasCtxMenu();
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeItemContextMenu();closeCanvasCtxMenu();}
+  if(e.key==='Escape'){closeItemContextMenu();closeCanvasCtxMenu();closeWikiTemplateSelector();closeEnemyDetails();}
 });
 
 /* ================================================================
@@ -3142,7 +3303,7 @@ function spawnParticipant(data){
     name:data.name,initiative:data.initiative,type:data.type,
     speed:data.speed,color:data.color,radius:data.radius,
     avatar:'',x:canvasSpawnPos.x,y:canvasSpawnPos.y,
-    movedUnits:0,maxHp:data.maxHp,hp:data.maxHp,
+    movedUnits:0,maxHp:data.maxHp,hp:data.maxHp,maxSanity:data.maxSanity,sanity:data.maxSanity,
     assignedTo:null,pingUntil:null,items:[]
   });
   updateInitiativeList();renderAssignmentList();drawAll();syncToServer();
@@ -3166,14 +3327,158 @@ if(isHost){
   document.getElementById('canvasCtxQuickPlayer').addEventListener('click',()=>{
     closeCanvasCtxMenu();
     const num=participants.filter(p=>p.type==='player').length+1;
-    spawnParticipant({name:'Player '+num,type:'player',initiative:25,speed:7,maxHp:18,color:'#6366f1',radius:PARTICLE_RADIUS});
+    spawnParticipant({name:'Player '+num,type:'player',initiative:25,speed:7,maxHp:18,maxSanity:5,color:'#6366f1',radius:PARTICLE_RADIUS});
   });
 
   document.getElementById('canvasCtxQuickEnemy').addEventListener('click',()=>{
     closeCanvasCtxMenu();
     const num=participants.filter(p=>p.type==='enemy').length+1;
-    spawnParticipant({name:'Enemy '+num,type:'enemy',initiative:2,speed:10,maxHp:20,color:'#e05252',radius:PARTICLE_RADIUS});
+    spawnParticipant({name:'Enemy '+num,type:'enemy',initiative:2,speed:10,maxHp:20,maxSanity:5,color:'#e05252',radius:PARTICLE_RADIUS});
   });
+
+  document.getElementById('canvasCtxFromTemplate').addEventListener('click',()=>{
+    closeCanvasCtxMenu();
+    if(!wikiTemplates.length){alert('No wiki templates imported yet. Use "Import Wiki Enemies" in the Setup tab.');return;}
+    openWikiTemplateSelector();
+  });
+}
+
+/* ================================================================
+   WIKI TEMPLATES — IMPORT & STORAGE
+================================================================ */
+let wikiTemplates=[];
+(function loadWikiTemplates(){
+  const stored=localStorage.getItem('combatWikiTemplates');
+  if(stored){try{wikiTemplates=JSON.parse(stored);}catch(e){wikiTemplates=[];}}
+  updateWikiTemplateCount();
+})();
+
+function saveWikiTemplates(){
+  localStorage.setItem('combatWikiTemplates',JSON.stringify(wikiTemplates));
+  updateWikiTemplateCount();
+}
+
+function updateWikiTemplateCount(){
+  const el=document.getElementById('wikiTemplateCount');
+  if(el) el.textContent=wikiTemplates.length?`${wikiTemplates.length} template(s) loaded`:'No templates loaded';
+}
+
+if(isHost){
+  document.getElementById('importWikiBtn').addEventListener('click',()=>{
+    document.getElementById('wikiImportFile').click();
+  });
+
+  document.getElementById('wikiImportFile').addEventListener('change',(evt)=>{
+    const file=evt.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      try{
+        const imported=JSON.parse(e.target.result);
+        if(!Array.isArray(imported)){alert('Invalid file format! Expected a JSON array of enemies.');return;}
+        wikiTemplates=imported;
+        saveWikiTemplates();
+        alert(`Successfully imported ${imported.length} enemy template(s).`);
+      }catch(err){alert('Error reading file: '+err.message);}
+    };
+    reader.readAsText(file);
+    evt.target.value='';
+  });
+}
+
+/* ================================================================
+   WIKI TEMPLATES — SELECTOR MODAL
+================================================================ */
+function openWikiTemplateSelector(){
+  const list=document.getElementById('wikiTemplateList');
+  list.innerHTML='';
+  wikiTemplates.forEach((tmpl,idx)=>{
+    const item=document.createElement('div');
+    item.className='wiki-template-item';
+    const name=document.createElement('div');
+    name.className='wiki-template-name';
+    name.textContent=tmpl.name||'Unnamed';
+    const info=document.createElement('div');
+    info.className='wiki-template-info';
+    const parts=[];
+    if(tmpl.hp)parts.push('HP: '+tmpl.hp);
+    if(tmpl.speed)parts.push('Speed: '+tmpl.speed);
+    if(tmpl.size)parts.push('Size: '+tmpl.size);
+    if(tmpl.type)parts.push(tmpl.type);
+    info.textContent=parts.join(' · ')||'No stats';
+    item.appendChild(name);
+    item.appendChild(info);
+    item.addEventListener('click',()=>{
+      closeWikiTemplateSelector();
+      spawnFromWikiTemplate(tmpl);
+    });
+    list.appendChild(item);
+  });
+  document.getElementById('wikiTemplateSelector').classList.add('open');
+}
+
+function closeWikiTemplateSelector(){
+  document.getElementById('wikiTemplateSelector').classList.remove('open');
+}
+document.getElementById('wikiTemplateSelectorClose').addEventListener('click',closeWikiTemplateSelector);
+document.getElementById('wikiTemplateSelector').addEventListener('click',e=>{if(e.target===document.getElementById('wikiTemplateSelector'))closeWikiTemplateSelector();});
+
+function parseSizeToRadius(size){
+  if(!size)return PARTICLE_RADIUS;
+  const num=parseInt(size);
+  if(!isNaN(num)&&num>0)return Math.max(5,num);
+  const s=size.toLowerCase().trim();
+  if(s==='tiny')return 10;
+  if(s==='small')return 15;
+  if(s==='medium')return PARTICLE_RADIUS;
+  if(s==='large')return 35;
+  if(s==='huge')return 50;
+  if(s==='gargantuan')return 65;
+  return PARTICLE_RADIUS;
+}
+
+function parseSpeed(speed){
+  if(!speed)return 6;
+  const num=parseInt(speed);
+  if(isNaN(num))return 6;
+  // Convert ft to units (assuming 5ft = 1 unit)
+  return Math.round(num/5);
+}
+
+function parseHp(hp){
+  if(!hp)return 20;
+  const num=parseInt(hp);
+  if(isNaN(num))return 20;
+  return num;
+}
+
+function spawnFromWikiTemplate(tmpl){
+  const maxHp=parseHp(tmpl.hp);
+  const maxSanity=parseHp(tmpl.sanity);
+  const speed=parseSpeed(tmpl.speed);
+  const radius=parseSizeToRadius(tmpl.size);
+  const wikiData={};
+  if(tmpl.weaknesses)wikiData.weaknesses=tmpl.weaknesses;
+  if(tmpl.resistances)wikiData.resistances=tmpl.resistances;
+  if(tmpl.immunities)wikiData.immunities=tmpl.immunities;
+  if(tmpl.notes)wikiData.notes=tmpl.notes;
+  if(tmpl.tactics)wikiData.tactics=tmpl.tactics;
+  if(tmpl.attacks)wikiData.attacks=tmpl.attacks;
+  if(tmpl.abilities)wikiData.abilities=tmpl.abilities;
+  if(tmpl.type)wikiData.creatureType=tmpl.type;
+  if(tmpl.size)wikiData.size=tmpl.size;
+  if(tmpl.sanity)wikiData.sanity=tmpl.sanity;
+
+  participants.push({
+    id:'p_'+Date.now()+'_'+Math.floor(Math.random()*1000),
+    name:tmpl.name||'Enemy',initiative:Math.floor(Math.random()*20)+1,type:'enemy',
+    speed:speed,color:tmpl.color||'#e05252',radius:radius,
+    avatar:'',x:canvasSpawnPos.x,y:canvasSpawnPos.y,
+    movedUnits:0,maxHp:maxHp,hp:maxHp,maxSanity:tmpl.sanity?maxSanity:undefined,sanity:tmpl.sanity?maxSanity:undefined,
+    assignedTo:null,pingUntil:null,items:[],
+    wikiData:wikiData
+  });
+  updateInitiativeList();renderAssignmentList();drawAll();syncToServer();
 }
 
 /* ================================================================
@@ -3188,6 +3493,53 @@ function openItemViewer(item,ownerName){
 function closeItemViewer(){
   document.getElementById('itemViewerModal').classList.remove('open');
 }
+
+/* ================================================================
+   ENEMY DETAILS — VIEWER MODAL (host only)
+================================================================ */
+function openEnemyDetails(p){
+  const data=p.wikiData||{};
+  document.getElementById('enemyDetailsTitle').textContent=p.name||'Unknown';
+  const subtitleParts=[];
+  if(data.size)subtitleParts.push(data.size);
+  if(data.creatureType)subtitleParts.push(data.creatureType);
+  document.getElementById('enemyDetailsSubtitle').textContent=subtitleParts.join(' · ')||'Enemy';
+
+  const body=document.getElementById('enemyDetailsBody');
+  body.innerHTML='';
+  const sections=[
+    {key:'weaknesses',title:'Weaknesses',cls:'weaknesses'},
+    {key:'resistances',title:'Resistances',cls:'resistances'},
+    {key:'immunities',title:'Immunities',cls:'immunities'},
+    {key:'attacks',title:'Attacks',cls:'tactics'},
+    {key:'abilities',title:'Special Abilities',cls:'tactics'},
+    {key:'sanity',title:'Sanity',cls:'notes'},
+    {key:'tactics',title:'Tactics / Behavior',cls:'tactics'},
+    {key:'notes',title:'Notes',cls:'notes'},
+  ];
+  let hasContent=false;
+  sections.forEach(sec=>{
+    if(data[sec.key]){
+      hasContent=true;
+      const div=document.createElement('div');div.className='detail-section';
+      const title=document.createElement('div');title.className='detail-section-title '+sec.cls;
+      title.textContent=sec.title;
+      const text=document.createElement('div');text.className='detail-section-text';
+      text.textContent=data[sec.key];
+      div.appendChild(title);div.appendChild(text);
+      body.appendChild(div);
+    }
+  });
+  if(!hasContent){
+    body.innerHTML='<div style=\"color:var(--text-muted);text-align:center;padding:20px\">No wiki details available for this entity.<br>Import enemy templates from the Wiki to see details here.</div>';
+  }
+  document.getElementById('enemyDetailsModal').classList.add('open');
+}
+function closeEnemyDetails(){
+  document.getElementById('enemyDetailsModal').classList.remove('open');
+}
+document.getElementById('enemyDetailsClose').addEventListener('click',closeEnemyDetails);
+document.getElementById('enemyDetailsModal').addEventListener('click',e=>{if(e.target===document.getElementById('enemyDetailsModal'))closeEnemyDetails();});
 
 /* ================================================================
    LAUNCH
