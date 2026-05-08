@@ -3376,9 +3376,14 @@ if(isHost){
       try{
         const imported=JSON.parse(e.target.result);
         if(!Array.isArray(imported)){alert('Invalid file format! Expected a JSON array of enemies.');return;}
-        wikiTemplates=imported;
+        let added=0,updated=0;
+        imported.forEach(tmpl=>{
+          const idx=wikiTemplates.findIndex(t=>t.name&&tmpl.name&&t.name===tmpl.name);
+          if(idx!==-1){wikiTemplates[idx]=tmpl;updated++;}
+          else{wikiTemplates.push(tmpl);added++;}
+        });
         saveWikiTemplates();
-        alert(`Successfully imported ${imported.length} enemy template(s).`);
+        alert(`Import complete: ${added} new, ${updated} updated.`);
       }catch(err){alert('Error reading file: '+err.message);}
     };
     reader.readAsText(file);
@@ -3468,6 +3473,7 @@ function spawnFromWikiTemplate(tmpl){
   if(tmpl.type)wikiData.creatureType=tmpl.type;
   if(tmpl.size)wikiData.size=tmpl.size;
   if(tmpl.sanity)wikiData.sanity=tmpl.sanity;
+  if(tmpl.drops)wikiData.drops=tmpl.drops;
 
   participants.push({
     id:'p_'+Date.now()+'_'+Math.floor(Math.random()*1000),
@@ -3513,7 +3519,7 @@ function openEnemyDetails(p){
     {key:'immunities',title:'Immunities',cls:'immunities'},
     {key:'attacks',title:'Attacks',cls:'tactics'},
     {key:'abilities',title:'Special Abilities',cls:'tactics'},
-    {key:'sanity',title:'Sanity',cls:'notes'},
+    {key:'drops',title:'Drops',cls:'notes'},
     {key:'tactics',title:'Tactics / Behavior',cls:'tactics'},
     {key:'notes',title:'Notes',cls:'notes'},
   ];
