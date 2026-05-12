@@ -177,6 +177,53 @@
             padding: 1.5rem;
         }
 
+        .enemy-card.draggable-card {
+            cursor: grab;
+        }
+
+        .enemy-card.draggable-card:active {
+            cursor: grabbing;
+        }
+
+        .enemy-header-main {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .enemy-image-preview {
+            width: 78px;
+            height: 78px;
+            flex: 0 0 78px;
+            border-radius: 0.75rem;
+            border: 2px solid rgba(251, 191, 36, 0.75);
+            background: #0f172a center/cover no-repeat;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+            overflow: hidden;
+        }
+
+        .enemy-image-preview.empty {
+            display: grid;
+            place-items: center;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 0.35rem;
+        }
+
+        .enemy-image-preview.large {
+            width: 112px;
+            height: 112px;
+            flex-basis: 112px;
+        }
+
+        .enemy-text-block {
+            min-width: 0;
+            flex: 1;
+        }
+
         .enemy-header {
             display: flex;
             justify-content: space-between;
@@ -192,6 +239,41 @@
 
         .enemy-type {
             color: #94a3b8;
+        }
+
+        .enemy-sprite-picker {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            padding: 0.9rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+        }
+
+        .enemy-sprite-actions {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+
+        .enemy-sprite-actions .row {
+            align-items: center;
+        }
+
+        .enemy-sprite-actions button {
+            width: auto;
+        }
+
+        .enemy-sprite-file {
+            display: none;
+        }
+
+        .enemy-sprite-clear {
+            background: #334155;
+            color: white;
         }
 
         .location-tags {
@@ -545,6 +627,20 @@
                         <input type="color" id="colorInput" value="#e05252">
                     </div>
                     <div class="form-group">
+                        <label style="color: #fbbf24;">Sprite / Image</label>
+                        <div class="enemy-sprite-picker">
+                            <div id="enemyImagePreview" class="enemy-image-preview empty">No image</div>
+                            <div class="enemy-sprite-actions">
+                                <div class="small">Upload an image to show on the wiki and in combat tokens.</div>
+                                <div class="row" style="gap:0.5rem">
+                                    <button id="enemyImageBtn" class="btn btn-secondary" type="button">Upload Image</button>
+                                    <button id="clearEnemyImage" class="btn btn-secondary enemy-sprite-clear" type="button">Clear</button>
+                                </div>
+                                <input type="file" id="enemyImageFile" class="enemy-sprite-file" accept="image/*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label style="color: #fbbf24;">Drops</label>
                         <textarea id="dropsInput" rows="3" placeholder="e.g., Gold&#10;Leather&#10;Bone Fragment"></textarea>
                     </div>
@@ -626,6 +722,7 @@
         let enemies = [];
         let editingIndex = null;
         let currentLocationTags = [];
+        let currentEnemyImage = '';
 
         // -------------------- Load/Save --------------------
         function loadEnemies() {
@@ -661,6 +758,36 @@
                 .replace(/'/g, "&#039;");
         }
 
+        function getEnemyImage(enemy) {
+            return (enemy && (enemy.image || enemy.sprite || enemy.avatar)) ? (enemy.image || enemy.sprite || enemy.avatar) : '';
+        }
+
+        function renderEnemyImagePreview(el, src, label = 'No image') {
+            if (!el) return;
+            if (src) {
+                el.style.backgroundImage = `url("${src}")`;
+                el.textContent = '';
+                el.classList.remove('empty');
+            } else {
+                el.style.backgroundImage = 'none';
+                el.textContent = label;
+                el.classList.add('empty');
+            }
+        }
+
+        function readEnemyImageFile(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    resolve('');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+                reader.readAsDataURL(file);
+            });
+        }
+
         function hideAllViews() {
             document.getElementById('listView').classList.add('hidden');
             document.getElementById('formView').classList.add('hidden');
@@ -683,17 +810,21 @@
 
             list.innerHTML = filtered.map(enemy => {
                 const actualIndex = enemies.indexOf(enemy);
+                const imageSrc = getEnemyImage(enemy);
                 return `
-                    <div class="enemy-card">
+                    <div class="enemy-card draggable-card" draggable="true" ondragstart="dragEnemy(event, ${actualIndex})">
                         <div class="enemy-header">
-                            <div>
-                                <h3 class="enemy-title clickable" onclick="showEnemyDetail(${actualIndex})">${escapeHtml(enemy.name)}</h3>
-                                <p class="enemy-type">${enemy.size ? escapeHtml(enemy.size) + ' ' : ''}${escapeHtml(enemy.type || '')}</p>
-                                ${enemy.locations && enemy.locations.length > 0 ? `
-                                    <div class="location-tags">
-                                        ${enemy.locations.map(loc => `<span class="location-tag">📍 ${escapeHtml(loc)}</span>`).join('')}
-                                    </div>
-                                ` : ''}
+                            <div class="enemy-header-main">
+                                ${imageSrc ? `<div class="enemy-image-preview" style="background-image:url(&quot;${escapeHtml(imageSrc)}&quot;)" aria-label="Enemy image"></div>` : `<div class="enemy-image-preview empty">No image</div>`}
+                                <div class="enemy-text-block">
+                                    <h3 class="enemy-title clickable" onclick="showEnemyDetail(${actualIndex})">${escapeHtml(enemy.name)}</h3>
+                                    <p class="enemy-type">${enemy.size ? escapeHtml(enemy.size) + ' ' : ''}${escapeHtml(enemy.type || '')}</p>
+                                    ${enemy.locations && enemy.locations.length > 0 ? `
+                                        <div class="location-tags">
+                                            ${enemy.locations.map(loc => `<span class="location-tag">📍 ${escapeHtml(loc)}</span>`).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
                             </div>
                             <div class="enemy-actions">
                                 <button class="btn-icon" onclick="editEnemy(${actualIndex})">✏️</button>
@@ -726,6 +857,7 @@
                     </div>
                 `;
             }).join('');
+
         }
 
         function getFilteredEnemies() {
@@ -851,10 +983,32 @@
             }
         });
 
+        document.getElementById('enemyImageBtn').addEventListener('click', () => {
+            document.getElementById('enemyImageFile').click();
+        });
+
+        document.getElementById('enemyImageFile').addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            try {
+                currentEnemyImage = await readEnemyImageFile(file);
+                renderEnemyImagePreview(document.getElementById('enemyImagePreview'), currentEnemyImage);
+            } catch (err) {
+                alert('Could not read the image: ' + err.message);
+            }
+            e.target.value = '';
+        });
+
+        document.getElementById('clearEnemyImage').addEventListener('click', () => {
+            currentEnemyImage = '';
+            renderEnemyImagePreview(document.getElementById('enemyImagePreview'), '');
+        });
+
         function editEnemy(index) {
             const enemy = enemies[index];
             editingIndex = index;
             currentLocationTags = enemy.locations ? [...enemy.locations] : [];
+            currentEnemyImage = getEnemyImage(enemy);
 
             document.getElementById('nameInput').value = enemy.name || '';
             document.getElementById('typeInput').value = enemy.type || '';
@@ -874,6 +1028,7 @@
             document.getElementById('notesInput').value = enemy.notes || '';
 
             renderLocationTags();
+            renderEnemyImagePreview(document.getElementById('enemyImagePreview'), currentEnemyImage);
 
             hideAllViews();
             document.getElementById('formView').classList.remove('hidden');
@@ -898,6 +1053,7 @@
                 ac: document.getElementById('acInput').value.trim(),
                 speed: document.getElementById('speedInput').value.trim(),
                 color: document.getElementById('colorInput').value,
+                image: currentEnemyImage || '',
                 drops: document.getElementById('dropsInput').value.trim(),
                 attacks: document.getElementById('attacksInput').value.trim(),
                 weaknesses: document.getElementById('weaknessesInput').value.trim(),
@@ -935,6 +1091,7 @@
             document.getElementById('listView').classList.remove('hidden');
             clearFormInputs();
             currentLocationTags = [];
+            currentEnemyImage = '';
             editingIndex = null;
         }
 
@@ -956,6 +1113,7 @@
             document.getElementById('tacticsInput').value = '';
             document.getElementById('notesInput').value = '';
             document.getElementById('locationTagInput').value = '';
+            renderEnemyImagePreview(document.getElementById('enemyImagePreview'), '');
         }
 
         function exportData() {
@@ -1039,13 +1197,17 @@
             const locsHtml = (enemy.locations && enemy.locations.length > 0)
                 ? `<div class="location-tags">${enemy.locations.map(l => `<span class="location-tag">📍 ${escapeHtml(l)}</span>`).join('')}</div>`
                 : '';
+            const imageSrc = getEnemyImage(enemy);
             return `
                 <div class="enemy-card detail-container">
                     <div class="enemy-header">
-                        <div>
-                            <h3 class="enemy-title">${escapeHtml(enemy.name)}</h3>
-                            <p class="enemy-type">${enemy.size ? escapeHtml(enemy.size) + ' ' : ''}${escapeHtml(enemy.type || '')}</p>
-                            ${locsHtml}
+                        <div class="enemy-header-main">
+                            ${imageSrc ? `<div class="enemy-image-preview large" style="background-image:url(&quot;${escapeHtml(imageSrc)}&quot;)" aria-label="Enemy image"></div>` : `<div class="enemy-image-preview large empty">No image</div>`}
+                            <div class="enemy-text-block">
+                                <h3 class="enemy-title">${escapeHtml(enemy.name)}</h3>
+                                <p class="enemy-type">${enemy.size ? escapeHtml(enemy.size) + ' ' : ''}${escapeHtml(enemy.type || '')}</p>
+                                ${locsHtml}
+                            </div>
                         </div>
                         <div class="enemy-actions">
                             <button class="btn-icon" onclick="editEnemy(${enemies.indexOf(enemy)})">✏️</button>
@@ -1061,7 +1223,12 @@
                         ${enemy.color && enemy.color !== '#e05252' ? `<div class="stat-box"><div class="stat-label">Color</div><div class="stat-value"><span style="display:inline-block;width:16px;height:16px;border-radius:4px;background:${escapeHtml(enemy.color)};vertical-align:middle"></span></div></div>` : ''}
                     </div>
 
-                    ${enemy.drops ? `<div class="drops-box"><div class="drops-header">📦 Drops</div><div class="info-text">${escapeHtml(enemy.drops)}</div></div>` : ''}
+                    ${enemy.drops ? `
+                        <div class="drops-box">
+                            <div class="drops-header">📦 Drops</div>
+                            <div class="info-text">${escapeHtml(enemy.drops)}</div>
+                        </div>
+                    ` : ''}
 
                     ${enemy.attacks ? `<div class="info-section"><div class="info-title attacks">Attacks</div><div class="info-text">${escapeHtml(enemy.attacks)}</div></div>` : ''}
                     ${enemy.weaknesses ? `<div class="info-section"><div class="info-title weaknesses">Weaknesses</div><div class="info-text">${escapeHtml(enemy.weaknesses)}</div></div>` : ''}
@@ -1072,6 +1239,17 @@
                     ${enemy.notes ? `<div class="info-section"><div class="info-title notes">Notes</div><div class="info-text">${escapeHtml(enemy.notes)}</div></div>` : ''}
                 </div>
             `;
+        }
+
+        function dragEnemy(event, index) {
+            const enemy = enemies[index];
+            if (!enemy) return;
+
+            event.dataTransfer.effectAllowed = 'copy';
+            const payload = JSON.stringify(enemy);
+            event.dataTransfer.setData('application/x-ttrpg-enemy', payload);
+            event.dataTransfer.setData('application/json', payload);
+            event.dataTransfer.setData('text/plain', enemy.name || 'Enemy');
         }
 
         // Initialize
